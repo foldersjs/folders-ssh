@@ -36,7 +36,9 @@ FoldersSsh.prototype.prepare = function() {
 			conn.pass = auth[1];
 		}
 	}
-	conn.debugMode = true;
+	//conn.debugMode = true;
+	conn.debugMode = false;
+
 	console.log("conn parse:");
 	console.log(conn);
 	// NOTES: Could use rush; PWD/CWD needs to be known.
@@ -44,6 +46,7 @@ FoldersSsh.prototype.prepare = function() {
 };
 
 FoldersSsh.prototype.ls = function(path, cb) {
+	console.log("[folders-ssh ls] folders-ssh, ls ", path);
 	var self = this;
 	if (path.length && path.substr(0, 1) != "/")
 		path = "/" + path;
@@ -56,7 +59,7 @@ FoldersSsh.prototype.ls = function(path, cb) {
 	var Client = require('ssh2').Client;
 	var conn = new Client();
 	conn.on('ready', function() {
-		console.log('Client :: ready');
+		console.log('[folders-ssh ls] Client :: ready');
 
 		// Via shell - example.
 		if(0)
@@ -73,22 +76,46 @@ FoldersSsh.prototype.ls = function(path, cb) {
 		});
 
 		// Via SFTP
+		console.log("[folders-ssh ls] begin to send sftp request,");
 		conn.sftp(function(err, sftp) {
-			if (err) throw err;
-			sftp.readdir('.', function(err, list) {
-				if (err) throw err;
-				console.dir(FoldersSsh.prototype.asFolders(path, list));
-				conn.end();
+			if (err){
+				console.log("[folders-ssh ls] error in sftp,", err);
+				throw err;
+			}
+			
+			console.log("[folders-ssh ls] begin to open dir");
+			sftp.opendir('.', function(err, handle){
+				if (err){
+					console.log("[folders-ssh ls] error in opendir,", err)
+					throw err;
+				}
+				
+				console.log("[folders-ssh ls] begin conn ftp read dir,",handle);
+				sftp.readdir(handle, function(err, list) {
+					if (err){
+						console.log("[folders-ssh ls] error in readdir,", err)
+						throw err;
+					}
+					
+					console.log("[folders-ssh ls] readdir result length,"+list.length);
+					//console.dir(FoldersSsh.prototype.asFolders(path, list));
+					cb(FoldersSsh.prototype.asFolders(path, list));
+					conn.end();
+				});
+				
 			});
+			
 		});
 
 
 	});
+
+	//FIXME parse from the conn string
 	conn.connect({
-		host: 'w46.jumis.com',
-		port: 22,
-		username: 'Downchuck',
-		privateKey: require('fs').readFileSync('/Users/chuck/.ssh/id_rsa')
+		host:"localhost",
+		port:3333,
+		username:"test",
+		privateKey:require('fs').readFileSync(home() + '/.ssh/id_rsa')
 	});
 
 };
@@ -120,7 +147,143 @@ FoldersSsh.prototype.asFolders = function(dir, files) {
 	return out;
 };
 
-FoldersSsh.prototype.cat = function(data, cb) {
+//FIXME need to adjust the input/cb param
+FoldersSsh.prototype.cat = function(path, cb) {
+	
+	var self = this;
+	//var path = data.data.fileId;
+	//	if (path.length && path.substr(0, 1) != "/")
+	//		path = "/" + path;
+
+	console.log("[folders-ssh cat] folders-ssh, cat ", path);
+	
+	// NOTES: Not using connection pooling nor re-using the connection.
+	var Client = require('ssh2').Client;
+	var conn = new Client();
+	conn.on('ready', function() {
+		console.log('[folders-ssh cat] Client :: ready');
+
+		// Via shell - example.
+		if (0)
+			conn.exec('cat', function(err, stream) {
+				if (err)
+					throw err;
+				stream.on('close',function(code, signal) {
+							console.log('Stream :: close :: code: ' + code + ', signal: '+ signal);
+							conn.end();
+						}).on('data', function(data) {
+					console.log('STDOUT: ' + data);
+				}).stderr.on('data', function(data) {
+					console.log('STDERR: ' + data);
+				});
+			});
+
+		// Via SFTP
+		console.log("[folders-ssh cat] begin to send cat request,");
+		conn.sftp(function(err, sftp) {
+			if (err) {
+				console.log("[folders-ssh cat] error in sftp,", err);
+				throw err;
+			}
+
+			console.log("[folders-ssh cat] begin conn sftp read file,");
+			
+				var buf = [];			
+				sftp.createReadStream(path).on('readable', function() { 
+	         var chunk;
+	         while ((chunk = this.read()) !== null) {
+	        	 console.log("[folders-ssh cat] read chunk, size:"+chunk.length);
+	        	 buf.push(chunk);
+	         }
+	       }).on('end', function() {
+	      	 console.log("[folders-ssh cat] read chunk end");
+        	 
+	         buf = Buffer.concat(buf);
+	         cb(buf);
+	         conn.end();
+	       });
+			
+		});
+
+	});
+	
+	//FIXME parse from the conn string
+	conn.connect({
+		host : "localhost",
+		port : 3333,
+		username : "test",
+		privateKey : require('fs').readFileSync(home() + '/.ssh/id_rsa')
+	});
+
+}
+
+//FIXME need to adjust the input/cb param
+FoldersSsh.prototype.write = function(path,data,cb) {
+	var self = this;
+
+	console.log("[folders-ssh write] folders-ssh, write ", path);
+	
+	// NOTES: Not using connection pooling nor re-using the connection.
+	var Client = require('ssh2').Client;
+	var conn = new Client();
+	conn.on('ready', function() {
+		console.log('[folders-ssh write] Client :: ready');
+
+		// Via shell - example.
+		if (0)
+			conn.exec('cat', function(err, stream) {
+				if (err)
+					throw err;
+				stream.on('close',function(code, signal) {
+							console.log('Stream :: close :: code: ' + code + ', signal: '+ signal);
+							conn.end();
+						}).on('data', function(data) {
+					console.log('STDOUT: ' + data);
+				}).stderr.on('data', function(data) {
+					console.log('STDERR: ' + data);
+				});
+			});
+
+		// Via SFTP
+		console.log("[folders-ssh write] begin to send write request,");
+		conn.sftp(function(err, sftp) {
+			if (err) {
+				console.log("[folders-ssh write] error in sftp,", err);
+				throw err;
+			}
+
+			console.log("[folders-ssh write] begin conn sftp read file,");
+			
+			// write data to ssh server
+			try {
+				var stream = sftp.createWriteStream(path);
+				stream.write(data, function() {
+					stream.end(function() {
+						cb("write uri success");
+						conn.end();
+					});
+				});
+
+			} catch (e) {
+				cb(null, "unable to write uri");
+				conn.end();
+			};
+			
+		});
+
+	});
+	
+	//FIXME parse from the conn string
+	conn.connect({
+		host : "localhost",
+		port : 3333,
+		username : "test",
+		privateKey : require('fs').readFileSync(home() + '/.ssh/id_rsa')
+	});
+	
+};
+
+FoldersSsh.prototype.cat_bak = function(data, cb) {
 	var self = this;
 	var path = data.data.fileId;
 	if (path.length && path.substr(0, 1) != "/")
@@ -170,7 +333,7 @@ FoldersSsh.prototype.cat = function(data, cb) {
 
 };
 
-FoldersSsh.prototype.write = function(data, cb) {
+FoldersSsh.prototype.write_bak = function(data, cb) {
 	var self = this;
 
 	var buf = data.data;
@@ -204,5 +367,9 @@ FoldersSsh.prototype.write = function(data, cb) {
 		// self.ftp.socket.end();
 	});
 };
+
+var home = function() {
+  return process.env[(process.platform == 'win32') ? 'USERPROFILE' : 'HOME'];
+}
 
 
