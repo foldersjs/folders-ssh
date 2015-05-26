@@ -59,25 +59,42 @@ ssh.ls('/', function(data) {
 	var data_ = (new Array(960 + 1)).join("Z");
 	ssh.write(testFileUri, data_, function(data){
 		console.log("\n###### Step 2: write ######");
-		console.log("[Test Case] : ssh server: write to ./data/test-write.txt");
+		console.log("[Test Case] : write to ./data/test-write.txt to ssh server");
 		console.log("[Test Case] : data Content: "+data.toString());
 		
 		// step 3: cat command, get the file we put to ssh server	
-		ssh.cat(testFileUri, function(data){
+		ssh.cat(testFileUri, function(stream) {
+
 			console.log("\n###### Step 3: cat ######")
-			console.log("[Test Case] : ssh server: cat ./test-folders.ssh.js");
-			console.log("[Test Case] : data length: "+data.length);
-			//console.log("[Test Case] : data Content: "+data.toString());
-			
-			//TODO should compare the data
-			assert = require('assert');
-			assert.deepEqual(data.toString(), data_.toString());
-			
-			// step 4: stop the local embeded ssh server if created 
-			if (sshServer != null) {
-				console.log(" [Test Case] : end sshServer");
-				sshServer.close();
-			}
+			console.log("[Test Case] : cat ./test-folders.ssh.js on ssh server");
+			// console.log("[Test Case] : data length: "+data.length);
+			// console.log("[Test Case] : data Content: "+data.toString());
+
+			// NOTES pasre the strean response from server
+			var buf = [];
+			stream.on('readable', function() {
+				var chunk;
+				while ((chunk = this.read()) !== null) {
+					console.log("[Test Case] read chunk, size:" + chunk.length);
+					buf.push(chunk);
+				}
+			}).on('end', function() {
+				console.log("[Test Case] read chunk end");
+
+				buf = Buffer.concat(buf);
+
+				// should compare the data we write with the data we got by 'cat' command
+				assert = require('assert');
+				assert.deepEqual(buf.toString(), data_.toString());
+
+				// step 4: stop the local embeded ssh server if created
+				if (sshServer != null) {
+					console.log(" [Test Case] : end sshServer");
+					sshServer.close();
+				}
+
+			});
+
 		});
 		
 	});
@@ -86,7 +103,7 @@ ssh.ls('/', function(data) {
 
 
 
-////describe('test for command ls/put/cat', function() {
+// //describe('test for command ls/put/cat', function() {
 ////	it('should cat the file data we put', function(done) {
 //		//this.timeout(5000);
 //

@@ -279,6 +279,8 @@ Server.prototype.start = function() {
 						sftp.handles[handle_] = stream;
 						sftp.handle(id, handle_);
 
+						// stop emitting data events
+						stream.pause();
 					});
 				}
 
@@ -303,6 +305,7 @@ Server.prototype.start = function() {
 			});
 
 			// read file from ssh2
+			var isReadEnd = false;
 			sftp.on('READ', function(id, handle, offset, length) {
 				console.log("[SSH Server] : sftp read request ", id, handle, offset);
 
@@ -313,24 +316,33 @@ Server.prototype.start = function() {
 					return;
 				}
 
-				stream.once('readable', function() {
-					var chunk;
-					while ((chunk = this.read()) !== null) {
-						console.log("[SSH Server] : stream readable, id: " + id
-								+ ", length:" + chunk.length);
-						// send chunk data
-						sftp.data(id, chunk);
-					}
-					// send File EOF status
-					sftp.status(id + 1, STATUS_CODE.EOF);
+				if (isReadEnd) {
+					console.log("[SSH Server] : buffer end, id: " + id);
+					sftp.status(id, STATUS_CODE.EOF);
+					return;
+				}
+
+				//set the 'data' and 'end' handler.
+				stream.once('data', function(chunk) {
+					// after recv a chunk data, we stop emitting data events
+					stream.pause();
+
+					console.log("[SSH Server] : stream readable, id: " + id + ", length:"
+							+ chunk.length);
+					// send chunk data
+					sftp.data(id, chunk);
+
+				});
+				stream.once('end', function() {
+					console.log("[SSH Server] : read stream end,");
+					isReadEnd = true;
+
+					// FIXME need a better way to specify the id,
+					sftp.status(id, STATUS_CODE.EOF);
 				});
 
-				// stream.removeAllListeners('end');
-				// stream.once('end', function() {
-				// console.log("[SSH Server] : buffer end, id: " + curReqId);
-				// // FIXME need a better way to specify the id,
-				// sftp.status(id+1, STATUS_CODE.EOF);
-				// });
+				// start to recv data
+				stream.resume();
 
 			});
 

@@ -187,21 +187,28 @@ FoldersSsh.prototype.cat = function(path, cb) {
 			}
 
 			console.log("[folders-ssh cat] begin conn sftp read file,");
+	
+			//var we simply return read stream rather than buffer
+			var stream = sftp.createReadStream(path);
+			cb(stream);
+			//FIXME how to close the conn here??
 			
-				var buf = [];			
-				sftp.createReadStream(path).on('readable', function() { 
-	         var chunk;
-	         while ((chunk = this.read()) !== null) {
-	        	 console.log("[folders-ssh cat] read chunk, size:"+chunk.length);
-	        	 buf.push(chunk);
-	         }
-	       }).on('end', function() {
-	      	 console.log("[folders-ssh cat] read chunk end");
-        	 
-	         buf = Buffer.concat(buf);
-	         cb(buf);
-	         conn.end();
-	       });
+			
+			// NOTES test on pasre the response from server
+			// var buf = [];
+			// sftp.createReadStream(path).on('readable', function() {
+			// var chunk;
+			// while ((chunk = this.read()) !== null) {
+			// console.log("[folders-ssh cat] read chunk, size:"+chunk.length);
+			// buf.push(chunk);
+			// }
+			// }).on('end', function() {
+			// console.log("[folders-ssh cat] read chunk end");
+			//        	 
+			// buf = Buffer.concat(buf);
+			// cb(buf);
+			// conn.end();
+			// });
 			
 		});
 
