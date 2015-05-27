@@ -64,7 +64,10 @@ FoldersSsh.prototype.ls = function(path, cb) {
 		// Via shell - example.
 		if(0)
 		conn.exec('ls', function(err, stream) {
-			if (err) throw err;
+			if (err) {
+				 console.error("[folders-ssh ls] error in ssh,",err);
+				 cb(null, err);
+			}
 				stream.on('close', function(code, signal) {
 				console.log('Stream :: close :: code: ' + code + ', signal: ' + signal);
 				conn.end();
@@ -79,22 +82,22 @@ FoldersSsh.prototype.ls = function(path, cb) {
 		console.log("[folders-ssh ls] begin to send sftp request,");
 		conn.sftp(function(err, sftp) {
 			if (err){
-				console.log("[folders-ssh ls] error in sftp,", err);
-				throw err;
+				console.error("[folders-ssh ls] error in sftp,", err);
+				cb(null, err);
 			}
 			
 			console.log("[folders-ssh ls] begin to open dir");
 			sftp.opendir('.', function(err, handle){
 				if (err){
-					console.log("[folders-ssh ls] error in opendir,", err)
-					throw err;
+					console.error("[folders-ssh ls] error in opendir,", err)
+					cb(null, err);
 				}
 				
 				console.log("[folders-ssh ls] begin conn ftp read dir,",handle);
 				sftp.readdir(handle, function(err, list) {
 					if (err){
-						console.log("[folders-ssh ls] error in readdir,", err)
-						throw err;
+						console.error("[folders-ssh ls] error in sftp,", err);
+						cb(null, err);
 					}
 					
 					console.log("[folders-ssh ls] readdir result length,"+list.length);
@@ -166,8 +169,10 @@ FoldersSsh.prototype.cat = function(path, cb) {
 		// Via shell - example.
 		if (0)
 			conn.exec('cat', function(err, stream) {
-				if (err)
-					throw err;
+				if (err) {
+					 console.error("[folders-ssh cat] error in ssh,",err);
+					 cb(null, err);
+				}
 				stream.on('close',function(code, signal) {
 							console.log('Stream :: close :: code: ' + code + ', signal: '+ signal);
 							conn.end();
@@ -182,8 +187,8 @@ FoldersSsh.prototype.cat = function(path, cb) {
 		console.log("[folders-ssh cat] begin to send cat request,");
 		conn.sftp(function(err, sftp) {
 			if (err) {
-				console.log("[folders-ssh cat] error in sftp,", err);
-				throw err;
+				console.error("[folders-ssh cat] error in sftp conn,",err);
+				cb(null, err);
 			}
 
 			console.log("[folders-ssh cat] begin conn sftp read file,");
@@ -255,8 +260,8 @@ FoldersSsh.prototype.write = function(path,data,cb) {
 		console.log("[folders-ssh write] begin to send write request,");
 		conn.sftp(function(err, sftp) {
 			if (err) {
-				console.log("[folders-ssh write] error in sftp,", err);
-				throw err;
+				console.error("[folders-ssh cat] error in sftp conn,",err);
+				cb(null, err);
 			}
 
 			console.log("[folders-ssh write] begin conn sftp read file,");

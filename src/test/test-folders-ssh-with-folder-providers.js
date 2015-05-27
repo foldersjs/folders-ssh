@@ -70,7 +70,7 @@ ssh.ls('/', function(data) {
 			// console.log("[Test Case] : data length: "+data.length);
 			// console.log("[Test Case] : data Content: "+data.toString());
 
-			// NOTES pasre the strean response from server
+			// NOTES parse the stream response from server
 			var buf = [];
 			stream.on('readable', function() {
 				var chunk;
