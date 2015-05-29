@@ -309,7 +309,7 @@ if (typeof (SSHCredentials.host) != 'undefined' && typeof (SSHCredentials.port) 
 }
 
 // start the folder-ssh provider.
-var ssh = new FoldersSsh(SSHCredentialsConnString, "localhost-ssh");
+var ssh = new FoldersSsh("localhost-ssh",SSHCredentialsConnString);
 // test file uri,
 // TODO may want use a /tmp dir file or a special dir in codebase for
 // testing.

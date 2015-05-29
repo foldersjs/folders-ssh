@@ -44,7 +44,7 @@ if (typeof (SSHCredentials.host) != 'undefined' && typeof (SSHCredentials.port) 
 console.log("[Test Case] : SSHCredentialsConnString:",SSHCredentialsConnString);
 
 // start the folder-ssh provider which will consume a ssh client
-var ssh = new FoldersSsh(SSHCredentialsConnString, "localhost-ssh");
+var ssh = new FoldersSsh("localhost-ssh",SSHCredentialsConnString);
 // test file uri,
 // TODO may want use a /tmp dir file or a special dir in codebase for testing.
 var testFileUri = "./data/test.txt";

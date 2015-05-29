@@ -11,6 +11,7 @@
   "bugs": {
     "url": "https://github.com/foldersjs/folders-ssh/issues"
   },
+  "main":"/src/folders-ssh",
   "homepage": "https://github.com/foldersjs/folders-ssh",
   "dependencies": {
     "ssh2": "~0.4.8",

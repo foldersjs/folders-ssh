@@ -6,7 +6,7 @@
 
 var ssh = require('ssh2');
 
-var FoldersSsh = function(connectionString, prefix) {
+var FoldersSsh = function(prefix,connectionString) {
 	this.prefix = prefix;
 	this.connectionString = connectionString;
 };
