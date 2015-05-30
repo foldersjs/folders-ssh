@@ -3,12 +3,21 @@
  * Folders.io provider: share an FTP endpoint.
  *
  */
-
+var uriParse = require('url');
 var ssh = require('ssh2');
 
-var FoldersSsh = function(prefix,connectionString) {
+var FoldersSsh = function(prefix,options) {
 	this.prefix = prefix;
-	this.connectionString = connectionString;
+	this.connectionString = options.connectionString;
+
+	// this is a flag to start a embedded ssh(sftp) server, using for test/debug
+	var enableEmbeddedServer = options.enableEmbeddedServer || false;
+	if (enableEmbeddedServer){
+		var conn = parseConnString(this.connectionString);
+		var SSHServer = require('./embedded-ssh-server');
+		this.server = new SSHServer(conn);
+		this.server.start();
+	}
 };
 
 module.exports = FoldersSsh;
@@ -22,25 +31,10 @@ FoldersSsh.prototype.prepare = function() {
 	if (typeof (self.ftp) != 'undefined' && self.ftp != null) {
 		return self.ftp;
 	}
-
 	var connectionString = this.connectionString;
-	var uri = uriParse.parse(connectionString, true);
-	var conn = {
-		host : uri.hostname || uri.host,
-		port : uri.port || 21
-	};
-	if (uri.auth) {
-		var auth = uri.auth.split(":", 2);
-		conn.user = auth[0];
-		if (auth.length == 2) {
-			conn.pass = auth[1];
-		}
-	}
-	//conn.debugMode = true;
-	conn.debugMode = false;
+	var conn = parseConnString(connectionString);
 
-	console.log("conn parse:");
-	console.log(conn);
+	console.log("conn to ssh server ", conn);
 	// NOTES: Could use rush; PWD/CWD needs to be known.
 	return new jsftp(conn);
 };
@@ -382,6 +376,23 @@ FoldersSsh.prototype.write_bak = function(data, cb) {
 
 var home = function() {
   return process.env[(process.platform == 'win32') ? 'USERPROFILE' : 'HOME'];
-}
+};
 
+var parseConnString = function(connectionString){
+	var uri = uriParse.parse(connectionString, true);
+	var conn = {
+		host : uri.hostname || uri.host,
+		port : uri.port || 21
+	};
+	if (uri.auth) {
+		var auth = uri.auth.split(":", 2);
+		conn.user = auth[0];
+		if (auth.length == 2) {
+			conn.pass = auth[1];
+		}
+	}
+	conn.debugMode = true;
+	
+	return conn;
+};
 

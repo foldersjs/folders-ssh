@@ -11,8 +11,11 @@ var fs = require('fs');
 var crypto = require('crypto');
 
 // folders module for local provider
-var FoldersLocal = new require("folders");
+var Fio = new require("folders");
+var fio = new Fio();
+var FoldersLocal = fio.local();
 var local = new FoldersLocal();
+//var local = new FoldersLocal();
 
 /*
  * consturctor with the ssh credentials @param credentials ,example { host :
@@ -25,7 +28,7 @@ var Server = function(credentials, debug) {
 	this.debug = debug;
 	this.sshServer = null;
 	console.log("[SSH Server] : inin the SSH Server,", this.SSHCredentials);
-}
+};
 
 module.exports = Server;
 
@@ -34,7 +37,7 @@ Server.prototype.close = function() {
 	if (this.sshServer != null) {
 		this.sshServer.close();
 	}
-}
+};
 
 // start the server
 Server.prototype.start = function() {
