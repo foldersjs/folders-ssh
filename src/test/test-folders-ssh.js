@@ -56,7 +56,7 @@ ssh.ls('/', function(data) {
 		console.log("[Test Case] : data Content: "+data.toString());
 		
 		// step 3: cat command, get the file we put to ssh server	
-		ssh.cat(testFileUri, function(stream) {
+		ssh.cat(testFileUri, function(result) {
 
 			console.log("\n###### Step 3: cat ######")
 			console.log("[Test Case] : cat ./test-folders.ssh.js on ssh server");
@@ -64,6 +64,7 @@ ssh.ls('/', function(data) {
 			// console.log("[Test Case] : data Content: "+data.toString());
 
 			// NOTES parse the stream response from server
+			var stream = result.stream;
 			var buf = [];
 			stream.on('readable', function() {
 				var chunk;

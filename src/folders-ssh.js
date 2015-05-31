@@ -14,6 +14,8 @@ var FoldersSsh = function(prefix,options) {
 	var enableEmbeddedServer = options.enableEmbeddedServer || false;
 	if (enableEmbeddedServer){
 		var conn = parseConnString(this.connectionString);
+		this.credentials = conn;
+		
 		var SSHServer = require('./embedded-ssh-server');
 		this.server = new SSHServer(conn);
 		this.server.start();
@@ -37,6 +39,15 @@ FoldersSsh.prototype.prepare = function() {
 	console.log("conn to ssh server ", conn);
 	// NOTES: Could use rush; PWD/CWD needs to be known.
 	return new jsftp(conn);
+};
+
+FoldersSsh.prototype.connect = function(conn) {
+	conn.connect({
+		host:this.credentials.host,
+		port:this.credentials.port,
+		username:this.credentials.user,
+		privateKey:require('fs').readFileSync(home() + '/.ssh/id_rsa')
+	});
 };
 
 FoldersSsh.prototype.ls = function(path, cb) {
@@ -107,14 +118,7 @@ FoldersSsh.prototype.ls = function(path, cb) {
 
 	});
 
-	//FIXME parse from the conn string
-	conn.connect({
-		host:"localhost",
-		port:3333,
-		username:"test",
-		privateKey:require('fs').readFileSync(home() + '/.ssh/id_rsa')
-	});
-
+	this.connect(conn);
 };
 
 FoldersSsh.prototype.asFolders = function(dir, files) {
@@ -189,7 +193,9 @@ FoldersSsh.prototype.cat = function(path, cb) {
 	
 			//var we simply return read stream rather than buffer
 			var stream = sftp.createReadStream(path);
-			cb(stream);
+			//FIXME need to add size,name meta information here
+			cb({stream:stream});
+			
 			//FIXME how to close the conn here??
 			
 			
@@ -213,13 +219,7 @@ FoldersSsh.prototype.cat = function(path, cb) {
 
 	});
 	
-	//FIXME parse from the conn string
-	conn.connect({
-		host : "localhost",
-		port : 3333,
-		username : "test",
-		privateKey : require('fs').readFileSync(home() + '/.ssh/id_rsa')
-	});
+	this.connect(conn);
 
 }
 
@@ -279,99 +279,7 @@ FoldersSsh.prototype.write = function(path,data,cb) {
 
 	});
 	
-	//FIXME parse from the conn string
-	conn.connect({
-		host : "localhost",
-		port : 3333,
-		username : "test",
-		privateKey : require('fs').readFileSync(home() + '/.ssh/id_rsa')
-	});
-	
-};
-
-FoldersSsh.prototype.cat_bak = function(data, cb) {
-	var self = this;
-	var path = data.data.fileId;
-	if (path.length && path.substr(0, 1) != "/")
-		path = "/" + path;
-
-	// var cwd = path || "";
-
-	// NOTES: Not using connection pooling nor re-using the connection.
-	self.ftp = this.prepare();
-
-	// TODO more stat and file check before cat
-	self.ftp.ls(path, function(err, content) {
-		var files = self.asFolders(path, content);
-
-		if (files.length <= 0) {
-			// TODO file not exist
-		}
-		var file = files[0];
-
-		var headers = {
-			"Content-Length" : file.size,
-			"Content-Type" : "application/octet-stream",
-			"X-File-Type" : "application/octet-stream",
-			"X-File-Size" : file.size,
-			"X-File-Name" : file.name
-		};
-
-		self.ftp.get(path, function(err, socket) {
-
-			// TODO how to pass the data,
-			// stream.Readable or Buffer or
-
-			// var str = "";
-			// socket.on("data", function(d) {str += d;});
-			// socket.on("close", function(hadErr) {socket.end();});
-
-			cb({
-				streamId : data.data.streamId,
-				data : socket, // FIXME: if socket Readable stream.
-				headers : headers,
-				shareId : data.shareId
-			});
-
-			// self.ftp.socket.end();
-		});
-	});
-
-};
-
-FoldersSsh.prototype.write_bak = function(data, cb) {
-	var self = this;
-
-	var buf = data.data;
-	var streamId = data.streamId;
-	var shareId = data.shareId;
-	var uri = data.uri;
-
-	// TODO uri normalize
-
-	var rspHeaders = {
-		"Content-Type" : "application/json"
-	};
-
-	self.ftp = this.prepare();
-
-	self.ftp.put(buf, uri, function(hadError) {
-		var result;
-		if (!hadError) {
-			result = "File transferred successfully!";
-		} else {
-			result = "File transferred failed!";
-		}
-		console.log("file transferred result:" + result);
-		cb({
-			streamId : streamId,
-			data : "write uri success",
-			headers : rspHeaders,
-			shareId : shareId
-		});
-
-		// self.ftp.socket.end();
-	});
+	this.connect(conn);
 };
 
 var home = function() {
