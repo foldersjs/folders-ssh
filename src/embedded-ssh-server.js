@@ -258,18 +258,9 @@ Server.prototype.start = function() {
 				// 'r', open file for reading
 				if (flags == OPEN_MODE.READ) {
 
-					// TODO how to pass the shareId, streamID..
-					// generete the request message for folders-local
-					var req = {
-						shareId : "test-share-Id",
-						data : {
-							fileId : path
-						}
-					};
-
 					// NOTES here we call the folders module(function folders-local.cat)
 					// to access local files.
-					local.cat(req, function cb(results, err) {
+					local.cat(path, function cb(results, err) {
 						if (err) {
 							console.log(err);
 							sftp.status(id, STATUS_CODE.NO_SUCH_FILE);
@@ -277,7 +268,7 @@ Server.prototype.start = function() {
 						}
 
 						// add the readable stream to handles cache.
-						var stream = results.data;
+						var stream = results.stream;
 						var handle_ = new Buffer(/http_window.io_0:ssh/ + path);
 						sftp.handles[handle_] = stream;
 						sftp.handle(id, handle_);
