@@ -223,7 +223,6 @@ FoldersSsh.prototype.cat = function(path, cb) {
 
 }
 
-//FIXME need to adjust the input/cb param
 FoldersSsh.prototype.write = function(path,data,cb) {
 	var self = this;
 
@@ -254,7 +253,7 @@ FoldersSsh.prototype.write = function(path,data,cb) {
 		console.log("[folders-ssh write] begin to send write request,");
 		conn.sftp(function(err, sftp) {
 			if (err) {
-				console.error("[folders-ssh cat] error in sftp conn,",err);
+				console.error("[folders-ssh write] error in sftp conn,",err);
 				cb(null, err);
 			}
 
@@ -263,15 +262,30 @@ FoldersSsh.prototype.write = function(path,data,cb) {
 			// write data to ssh server
 			try {
 				var stream = sftp.createWriteStream(path);
-				stream.write(data, function() {
-					stream.end(function() {
-						cb("write uri success");
-						conn.end();
+				
+				if (data instanceof Buffer){
+					stream.write(data, function() {
+						stream.end(function() {
+							cb("write uri success");
+							conn.end();
+						});
 					});
-				});
+				}else {
+					var errHandle = function(e){
+						cb(null,e.message);
+						conn.end();
+					};
+					data
+					.on('error',errHandle)
+						.pipe(stream)
+						.on('error',errHandle)
+						.on('end', function() {
+								cb("write uri success");
+								conn.end();});
+				}
 
 			} catch (e) {
-				cb(null, "unable to write uri");
+				cb(null, "unable to write uri,"+e.message);
 				conn.end();
 			};
 			

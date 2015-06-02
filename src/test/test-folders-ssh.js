@@ -49,7 +49,7 @@ ssh.ls('/', function(data) {
 	console.log(data);
 	
 	// step 2: write command, put data to ssh server
-	var data_ = (new Array(960 + 1)).join("Z");
+	var data_ = new Buffer((new Array(960 + 1)).join("Z"));
 	ssh.write(testFileUri, data_, function(data){
 		console.log("\n###### Step 2: write ######");
 		console.log("[Test Case] : write to ./data/test-write.txt to ssh server");
