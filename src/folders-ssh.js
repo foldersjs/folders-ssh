@@ -24,6 +24,13 @@ var FoldersSsh = function(prefix,options) {
 
 module.exports = FoldersSsh;
 
+FoldersSsh.prototype.features = FoldersSsh.features = {
+	cat : true,
+	ls : true,
+	write : true,
+	server : true
+};
+
 FoldersSsh.prototype.prepare = function() {
 	// FIXME looks like new jsftp(conn) and self.ftp.socket.end() for every
 	// action will caused some socket action. Need to check.
