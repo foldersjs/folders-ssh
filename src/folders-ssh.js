@@ -277,18 +277,18 @@ FoldersSsh.prototype.write = function(path,data,cb) {
 							conn.end();
 						});
 					});
-				}else {
-					var errHandle = function(e){
-						cb(null,e.message);
+				} else {
+					var errHandle = function(e) {
+						cb(null, e.message);
 						conn.end();
 					};
-					data
-					.on('error',errHandle)
-						.pipe(stream)
-						.on('error',errHandle)
-						.on('end', function() {
-								cb("write uri success");
-								conn.end();});
+					data.on('error', errHandle).pipe(stream).on('error', errHandle);
+
+					data.on('end', function() {
+						//stream.end();
+						cb("write uri success");
+						conn.end();
+					});
 				}
 
 			} catch (e) {

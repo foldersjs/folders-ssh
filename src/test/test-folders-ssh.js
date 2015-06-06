@@ -49,17 +49,17 @@ ssh.ls('/', function(data) {
 	console.log(data);
 	
 	// step 2: write command, put data to ssh server
+	console.log("\n###### Step 2: write ######");
+	console.log("[Test Case] : write to ./data/test-write.txt to ssh server");
+	var stream = require('fs').createReadStream('./data/test.txt');
 	var data_ = new Buffer((new Array(960 + 1)).join("Z"));
-	ssh.write(testFileUri, data_, function(data){
-		console.log("\n###### Step 2: write ######");
-		console.log("[Test Case] : write to ./data/test-write.txt to ssh server");
-		console.log("[Test Case] : data Content: "+data.toString());
+	ssh.write(testFileUri, stream, function(data){
 		
+		console.log("\n###### Step 3: cat ######")
+		console.log("[Test Case] : cat ./test-folders.ssh.js on ssh server");
 		// step 3: cat command, get the file we put to ssh server	
 		ssh.cat(testFileUri, function(result) {
-
-			console.log("\n###### Step 3: cat ######")
-			console.log("[Test Case] : cat ./test-folders.ssh.js on ssh server");
+			
 			// console.log("[Test Case] : data length: "+data.length);
 			// console.log("[Test Case] : data Content: "+data.toString());
 
