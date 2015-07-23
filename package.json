@@ -16,6 +16,7 @@
   "dependencies": {
     "buffer-equal-constant-time": "1.x",
     "folders": "0.0.x",
+    "mime": "^1.3.4",
     "ssh2": "0.4.x"
   },
   "devDependencies": {}
