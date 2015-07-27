@@ -316,7 +316,7 @@ Server.prototype.start = function ( backend ) {
         }
 
         // 'w', open file for writing
-        if ( flags == OPEN_MODE.TRUNC | OPEN_MODE.CREAT | OPEN_MODE.WRITE ) {
+        if ( flags == ( OPEN_MODE.TRUNC | OPEN_MODE.CREAT | OPEN_MODE.WRITE )) {
 
 
           //var handle_ = new Buffer(/http_window.io_0:ssh/ + path);
