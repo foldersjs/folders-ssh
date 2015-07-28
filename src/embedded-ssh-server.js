@@ -225,59 +225,45 @@ Server.prototype.start = function ( backend ) {
         // FIXME: Use counter.
         //var handle_ = new Buffer([ 1, 2, 3, Math.round(Math.random(4)) ]);
         var handle_ = new Buffer( randomValueHex() );
-        sftp.handles[ handle_ ] = path;
+        //sftp.handles[ handle_ ] = path;
+		
+		
+		sftp.handles[handle_ ] = {
+		  path: path,
+		  next_index: 0, //index of the next file to be returned in readdir. We will return all files so this value will either be 0 or files count
+		}
         sftp.handle( id, handle_ );
-
-
-
-        //FIXME: not sure how to used
-        //FIXME: do we need this ?
-        /*
-        var once = false;
-        sftp.handles[handle_] = function() {
-        	if (!once)
-        		once = true;
-        	else
-        		return true;
-        	return false;
-
-        };*/
 
       } );
 
 
 
       sftp.on( 'READDIR', function ( id, handle ) {
-
-
         console.log( "[SSH Server] : readdir, id: ", id, handle );
-        var path = sftp.handles[ handle ];
+		
+        var path = sftp.handles[ handle ].path;
 
-        //FIXME: do we need this ?
-        /*
-        if (sftp.handles[handle]()) {
-
+		
+        //if (sftp.handles[handle]()) {
+		if (sftp.handles[handle].next_index > 0) {
+			console.log('return empty to indicate end of readdir')
         	sftp.name(id, []);
         	return;
         }
-        */
-
-
-
+        
 
         // NOTES here we call the folders module(function folders-local.ls) to
         // access local files.
-
-        backend.ls( path, function ( err, res ) {
+		
+        backend.ls(path, function ( err, res ) {
           var list_ = asSSHFile( res );
-          console.log( "[SSH Server] : sftp readir response, id:" + id
+		  sftp.handles[handle].next_index = list_.length;
+		  
+		  console.log( "[SSH Server] : sftp readir response, id:" + id
               + ", list.length: ", list_.length );
+		  
           sftp.name( id, list_ );
-
-
         } );
-
-
       } );
 
       // open the file, createReadStream/createWriteStream will first open the
@@ -478,14 +464,23 @@ Server.prototype.start = function ( backend ) {
       } );
 
       sftp.on( 'REALPATH', function ( id, path ) {
+		console.log('REALPATH', path);
+		
         var name = {
-          filename: '/tmp',
+          filename: '/',
           attrs: {
             size: 0
           }
         };
-        if ( path.indexOf( '/tmp' ) === 0 )
-          name.filename = path;
+		/*
+        if ( path.indexOf( '/S3' ) === 0 )
+          name.filename = path;*/
+		
+		if (path !='.')
+		  name.filename = path;
+	  
+		//haipt:
+		//name.filename = path;
         sftp.name( id, name );
       } );
 
