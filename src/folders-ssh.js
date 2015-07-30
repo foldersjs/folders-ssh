@@ -310,7 +310,7 @@ FoldersSsh.prototype.write = function ( path, data, cb ) {
 
             if ( err ) {
 
-              return errHandle(err);
+              return errHandle( err );
             }
 
             data.on( 'data', function ( buf ) {
@@ -319,7 +319,7 @@ FoldersSsh.prototype.write = function ( path, data, cb ) {
               sftp.write( handle, buf, 0, buf.length, 5, function ( err ) {
 
                 if ( err ) {
-                  return errHandle(err);
+                  return errHandle( err );
                 }
 
               } );
@@ -339,7 +339,7 @@ FoldersSsh.prototype.write = function ( path, data, cb ) {
 
 
                 if ( err ) {
-                  return errHandle(err);
+                  return errHandle( err );
                 }
 
               } );
@@ -375,6 +375,90 @@ FoldersSsh.prototype.write = function ( path, data, cb ) {
 
   this.connect( conn );
 };
+
+FoldersSsh.prototype.unlink = function ( path, cb ) {
+
+  var self = this;
+
+  console.log( "[folders-ssh unlink] folders-ssh, unlink ", path );
+
+  // NOTES: Not using connection pooling nor re-using the connection.
+  var Client = require( 'ssh2' ).Client;
+  var conn = new Client();
+  conn.on( 'ready', function () {
+    console.log( '[folders-ssh unlink] Client :: ready' );
+    // Via SFTP
+    console.log( "[folders-ssh unlink] begin to send unlink request," );
+    conn.sftp( function ( err, sftp ) {
+      if ( err ) {
+        console.error( "[folders-ssh unlink] error in sftp conn,", err );
+        cb( err );
+      }
+
+      console.log( "[folders-ssh unlink] begin conn sftp unlink file," );
+
+      sftp.unlink( path, function ( err ) {
+
+        if ( err ) {
+
+          console.error( "[folders-ssh unlink] error in sftp unlink,", err );
+          cb( err );
+
+        }
+        cb();
+
+      } );
+
+    } );
+
+  } );
+
+  this.connect( conn );
+
+
+}
+
+FoldersSsh.prototype.rmdir = function ( path, cb ) {
+
+  var self = this;
+
+  console.log( "[folders-ssh rmdir] folders-ssh, rmdir ", path );
+
+  // NOTES: Not using connection pooling nor re-using the connection.
+  var Client = require( 'ssh2' ).Client;
+  var conn = new Client();
+  conn.on( 'ready', function () {
+    console.log( '[folders-ssh rmdir] Client :: ready' );
+    // Via SFTP
+    console.log( "[folders-ssh rmdir] begin to send rmdir request," );
+    conn.sftp( function ( err, sftp ) {
+      if ( err ) {
+        console.error( "[folders-ssh rmdir] error in sftp conn,", err );
+        cb( err );
+      }
+
+      console.log( "[folders-ssh rmdir] begin conn sftp rmdir dir," );
+
+      sftp.rmdir( path, function ( err ) {
+
+        if ( err ) {
+
+          console.error( "[folders-ssh rmdir] error in sftp rmdir,", err );
+          cb( err );
+
+        }
+        cb();
+
+      } );
+
+
+    } );
+
+  } );
+
+  this.connect( conn );
+
+}
 
 var home = function () {
   return process.env[ (process.platform == 'win32') ? 'USERPROFILE' : 'HOME' ];
