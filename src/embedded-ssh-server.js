@@ -465,22 +465,17 @@ Server.prototype.start = function ( backend ) {
 
       sftp.on( 'REALPATH', function ( id, path ) {
 		console.log('REALPATH', path);
-		
+		//default: start from root dir
         var name = {
           filename: '/',
           attrs: {
             size: 0
           }
         };
-		/*
-        if ( path.indexOf( '/S3' ) === 0 )
-          name.filename = path;*/
 		
 		if (path !='.')
 		  name.filename = path;
-	  
-		//haipt:
-		//name.filename = path;
+		
         sftp.name( id, name );
       } );
 
