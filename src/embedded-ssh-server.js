@@ -5,15 +5,15 @@
  * The SSH Server show a example on how to use the [folders-local](git://github.com/foldersjs/folders.git#master) module.
  * using the local provider for directory listing and file activities. 
  */
+
 var ssh2 = require( 'ssh2' );
 var fs = require( 'fs' );
 var crypto = require( 'crypto' );
 
 
+
 // folders module for file system provider
 var Fio = new require( "folders" );
-
-
 
 
 /*
@@ -131,6 +131,7 @@ Server.prototype.start = function ( backend ) {
 
       // file stats
       // NOTES: Internal stats for the ssh2 implementation.
+
       function Stats( initial ) {
         this.mode = (initial && initial.mode);
         this.permissions = this.mode; // backwards compatiblity
@@ -186,6 +187,7 @@ Server.prototype.start = function ( backend ) {
               mtime: file.modificationTime
             } )
           };
+
           out.push( o );
         }
         return out;
@@ -198,7 +200,7 @@ Server.prototype.start = function ( backend ) {
 
         var attrs_ = {
           mode: 0755 | constants.S_IFDIR,
-		  size: 10 * 1024,
+          size: 10 * 1024,
           uid: 9001,
           gid: 9001,
           atime: (Date.now() / 1000) | 0,
@@ -220,25 +222,32 @@ Server.prototype.start = function ( backend ) {
         console.log( "[SSH Server] : sftp on opendir request, id:" + id + ", path:" + path );
 
 
+
         // FIXME: Use counter.
         //var handle_ = new Buffer([ 1, 2, 3, Math.round(Math.random(4)) ]);
         var handle_ = new Buffer( randomValueHex() );
         //sftp.handles[ handle_ ] = path;
 
+
+
         sftp.handles[ handle_ ] = {
           path: path,
           next_index: 0, //index of the next file to be returned in readdir. We will return all files so this value will either be 0 or files count
         };
+
         sftp.handle( id, handle_ );
 
       } );
 
 
 
+
       sftp.on( 'READDIR', function ( id, handle ) {
         console.log( "[SSH Server] : readdir, id: ", id, handle );
 
+
         var path = sftp.handles[ handle ].path;
+
 
 
         //if (sftp.handles[handle]()) {
@@ -249,26 +258,29 @@ Server.prototype.start = function ( backend ) {
         }
 
 
+
         // NOTES here we call the folders module(function folders-local.ls) to
         // access local files.
+
 
         backend.ls( path, function ( err, res ) {
           var list_ = asSSHFile( res );
           sftp.handles[ handle ].next_index = list_.length;
-
           console.log( "[SSH Server] : sftp readir response, id:" + id + ", list.length: ", list_.length );
-
           sftp.name( id, list_ );
         } );
       } );
 
       // open the file, createReadStream/createWriteStream will first open the
       // file.
+
+
       sftp.on( 'OPEN', function ( id, path, flags, attrs ) {
         console.log( "[SSH Server] : sftp open request ", id, path, flags, attrs );
 
         // 'r', open file for reading
         if ( flags == OPEN_MODE.READ ) {
+
 
           // NOTES here we call the folders module(function folders-local.cat)
           // to access backend files.
@@ -280,15 +292,20 @@ Server.prototype.start = function ( backend ) {
               return;
             }
 
+
+
             // add the readable stream to handles cache.
             var stream = results.stream;
+
             //var handle_ = new Buffer(/http_window.io_0:ssh/ + path);
             var handle_ = new Buffer( randomValueHex() ); //var handle_ = new Buffer(/http_window.io_0:ssh/ + path)
             sftp.handles[ handle_ ] = stream;
             sftp.handle( id, handle_ );
 
+
             // stop emitting data events
             stream.pause();
+
           } );
 
 
@@ -307,12 +324,15 @@ Server.prototype.start = function ( backend ) {
 
           var pass = new require( 'stream' ).PassThrough()
 
+
           backend.write( path, pass, function ( err, result ) {
 
             if ( err ) {
               sftp.status( id, STATUS_CODE.FAILURE );
               return;
             }
+
+
 
           } );
 
@@ -334,20 +354,29 @@ Server.prototype.start = function ( backend ) {
         }
 
         if ( sftp.handles[ handle ] )
+
           delete sftp.handles[ handle ];
 
         sftp.status( id, STATUS_CODE.OK );
+
 
       } );
 
       // read file from ssh2
       var isReadEnd = false;
 
+      var read = 0 ;
+      var buff = null;
+
+
       sftp.on( 'READ', function ( id, handle, offset, length ) {
+
         console.log( "[SSH Server] : sftp read request ", id, handle, offset );
+
 
         // get the stream from the cache
         var stream = sftp.handles[ handle ];
+
 
         if ( stream == null || typeof (stream) == 'undefined' ) {
 
@@ -355,38 +384,88 @@ Server.prototype.start = function ( backend ) {
           return;
         }
 
+
+
         if ( isReadEnd ) {
           console.log( "[SSH Server] : buffer end, id: " + id );
           sftp.status( id, STATUS_CODE.EOF );
+          isReadEnd = false;
+          read = 0 ;
+          buff = null;
           return;
         }
 
+        if ( buff ) {
 
-        //set the 'data' and 'end' handler.
-        stream.once( 'data', function ( chunk ) {
-          // after recv a chunk data, we stop emitting data events
-          stream.pause();
+          if ( buff.length > length ) {
+            var buf1 = buff.slice( 0, length );
+            sftp.data( id, buf1 );
+            buff = buff.slice( length );
 
-          console.log( "[SSH Server] : stream readable, id: " + id + ", length:"
+          } else {
+            sftp.data( id, buff );
+            buff = null;
+            stream.resume();
+          }
+          //return ;
+
+        } else {
 
 
-              + chunk.length );
-          // send chunk data
-          sftp.data( id, chunk );
+          //set the 'data' and 'end' handler.
+          stream.once( 'data', function ( chunk ) {
+            // after recv a chunk data, we stop emitting data events
+            stream.pause();
+
+            var chunkLen = chunk.length;
+            console.log( "[SSH Server] : stream readable, id: " + id + ", length:"
 
 
-        } );
+                + chunk.length );
 
-        stream.once( 'end', function () {
-          console.log( "[SSH Server] : read stream end," );
-          isReadEnd = true;
 
+            if ( chunkLen > length ) {
+
+
+              // extract buffer of length 'length' from chunk
+
+              var buf1 = chunk.slice( 0, length );
+              // store remaining chunk in buff
+              buff = chunk.slice( length );
+
+              // send buf1 of length to client
+              sftp.data( id, buf1 );
+
+
+
+            } else {
+              // chunk is smaller then requested length
+              // send it client as it is.
+              sftp.data( id, chunk );
+
+            }
+
+
+          } );
+
+          stream.resume();
+
+        }
+
+
+        if ( read == 1 ) {
+          // register only one 'end listner' during  
+          // file transfer
+          stream.once( 'end', function () {
+            console.log( "[SSH Server] : read stream end," );
+            
+            isReadEnd = true;
           // FIXME need a better way to specify the id,
-          sftp.status( id, STATUS_CODE.EOF );
-        } );
+          //sftp.status( id, STATUS_CODE.EOF );
+          } );
 
-        // start to recv data
-        stream.resume();
+
+        }
 
 
       } );
@@ -413,11 +492,15 @@ Server.prototype.start = function ( backend ) {
         if (path == null || typeof (path) == 'undefined') {
         	sftp.status(id, STATUS_CODE.FAILURE);
         	return;
+
 			
 
         }
         
         
+
+
+
         // generate the request message for folders module
         var req = {
         	uri : path,
@@ -466,12 +549,28 @@ Server.prototype.start = function ( backend ) {
 
         } );
 
-
       } );
-
+	  
+	  sftp.on('RMDIR',function(id,path){
+		console.log( "[SSH Server] : sftp rmdir request, ", id, path);
+		
+		backend.rmdir(path,function(err,res){
+		
+			if (err){
+			  		sftp.status(id, STATUS_CODE.FAILURE);
+			  }else{
+				  
+				  sftp.status(id, STATUS_CODE.OK);
+			  }
+			
+			
+		} );
+		
+		} );	
 
       sftp.on( 'REALPATH', function ( id, path ) {
         console.log( 'REALPATH', path );
+
 
         var name = {
           filename: '/',
@@ -480,16 +579,22 @@ Server.prototype.start = function ( backend ) {
           }
         };
         /*
+
             if ( path.indexOf( '/S3' ) === 0 )
               name.filename = path;*/
 
         if ( path != '.' )
+
+
           name.filename = path;
+
 
         //haipt:
         //name.filename = path;
         sftp.name( id, name );
       } );
+
+
 
     };
 
@@ -502,6 +607,7 @@ Server.prototype.start = function ( backend ) {
         // https://github.com/mscdex/ssh2-streams/blob/master/SFTPStream.md
         session.once( 'exec', function ( accept, reject, info ) {
           console.log( '[SSH Server] : Client wants to execute: ' + require( 'util' ).inspect( info.command ) );
+
         } );
 
         // See:
