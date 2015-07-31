@@ -334,7 +334,8 @@ Server.prototype.start = function ( backend ) {
 			  transferred: 0,  //count how much bytes have been transferred
 			  //FIXME: move buff into here,
 			  hooked: false, //whether we already hook the events
-			  readId: 0, //whether we have some FTP read command waiting for data
+			  //readId: 0, //whether we have some FTP read command waiting for data
+			  queuedRead: [], //the read commands that are being queued, sometimes SFTP might issue multiple read concurrently and wait for the results to speed up through put
 			  readLength: 0, //what length is the waiting read command want to read.
 			};
             sftp.handle( id, handle_ );
@@ -423,7 +424,7 @@ Server.prototype.start = function ( backend ) {
 
 
 		
-        if ( isReadEnd && buff.length == 0 ) { //we reach end-of-read, and transferred all the data!
+        if ( isReadEnd  ) { //we reach end-of-read, and transferred all the data!
           console.log( "[SSH Server] : buffer end, id: " + id  + " transferred: " + sftp.handles[handle].transferred);
 		  
           sftp.status( id, STATUS_CODE.EOF );
@@ -442,7 +443,24 @@ Server.prototype.start = function ( backend ) {
           stream.once( 'end', function () {
             console.log( "[SSH Server] : read stream end," );
             
-            isReadEnd = true;
+			//fulfill the last queued read with whatever I have:
+			if (sftp.handles[handle].queuedRead.length > 0) { //has an waiting read command
+			  //var length = sftp.handles[handle].readLength; //the read length from the request
+			  var cmd = sftp.handles[handle].queuedRead[0];
+			  //var length = cmd.length;
+			  var id = cmd.id;
+			  sftp.data( id, buff );
+			}
+			sftp.handles[handle].queuedRead.shift();
+			
+			if (sftp.handles[handle].queuedRead.length > 0) {
+			  //still got outstanding queued read, use this to deliver EOF
+			  var cmd = sftp.handles[handle].queuedRead[0];
+			  var id = cmd.id;
+			  sftp.status( id, STATUS_CODE.EOF );
+			}
+			
+			isReadEnd = true;
           // FIXME need a better way to specify the id,
           //sftp.status( id, STATUS_CODE.EOF );
           } );
@@ -481,19 +499,21 @@ Server.prototype.start = function ( backend ) {
             */
 			buff = Buffer.concat([buff, chunk]);
 			console.log('buffer level: ', buff.length);
-			if (sftp.handles[handle].readId > 0) { //has an waiting read command
-			  var length = sftp.handles[handle].readLength; //the read length from the request
-			  if ( buff.length >= length ) {
+			if (sftp.handles[handle].queuedRead.length > 0) { //has an waiting read command
+			  //var length = sftp.handles[handle].readLength; //the read length from the request
+			  var cmd = sftp.handles[handle].queuedRead[0];
+			  var length = cmd.length;
+			  var id = cmd.id;
+			  if ( buff.length >= length ) { //enough data to fulfill request
 				var buf1 = buff.slice( 0, length );
 				sftp.handles[handle].transferred += length;
-				sftp.data( sftp.handles[handle].readId, buf1 );
+				sftp.data( id, buf1 );
 				buff = buff.slice( length );
-				console.log('fulfill waiting read: ' + sftp.handles[handle].readId + " transferred: " + sftp.handles[handle].transferred + ' buffer level: ' + buff.length);
-				sftp.handles[handle].readId  = 0;
-				sftp.handles[handle].readLength  = 0;
-				if (buff.length > 1E6) {
-				  stream.pause(); //buffer level too high, wait for downstream to consume first
-				}
+				console.log('fulfill waiting read: ' + id + " transferred: " + sftp.handles[handle].transferred + ' buffer level: ' + buff.length);
+				//sftp.handles[handle].readId  = 0;
+				//sftp.handles[handle].readLength  = 0;
+				//remove the request from queue
+				sftp.handles[handle].queuedRead.shift();
 			  }
 			  //don't send partial data!
 			  /*
@@ -506,6 +526,10 @@ Server.prototype.start = function ( backend ) {
 			  
 			  
 			}
+			
+			if (buff.length > 1E6) {
+			  stream.pause(); //buffer level too high, wait for downstream to consume first
+			}
           } );
         }
 		
@@ -516,9 +540,6 @@ Server.prototype.start = function ( backend ) {
 		  buff = buff.slice( length );
 		  
 		  console.log('transferred: ' + sftp.handles[handle].transferred + ' buffer level: ' + buff.length);
-		  
-		  
-
 		} else {
 		  /*
 		  //send all we have
@@ -530,9 +551,10 @@ Server.prototype.start = function ( backend ) {
 		  else {
 		  */
 		  //not enough data, wait first!
-			console.log('waiting read: ', id); //exhausted the buffer!
-			sftp.handles[handle].readId = id;
-			sftp.handles[handle].readLength = length;
+			console.log('queue read: ', id, length); //exhausted the buffer!
+			sftp.handles[handle].queuedRead.push({ id: id, length: length});
+			//sftp.handles[handle].readId = id;
+			//sftp.handles[handle].readLength = length;
 		  //}
 		}
 		
