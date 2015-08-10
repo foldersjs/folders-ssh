@@ -5,7 +5,6 @@
  * The SSH Server show a example on how to use the [folders-local](git://github.com/foldersjs/folders.git#master) module.
  * using the local provider for directory listing and file activities. 
  */
-
 var ssh2 = require( 'ssh2' );
 var fs = require( 'fs' );
 var crypto = require( 'crypto' );
@@ -105,8 +104,8 @@ Server.prototype.start = function ( backend ) {
       // use the path or something as the key, the stream/handler or something
       // as the value
       sftp.handles = { };
-	  
-	  sftp.cache =  { }; //cache files for stats
+
+      sftp.cache = { }; //cache files for stats
 
       // ssh2 status code
       var STATUS_CODE = {
@@ -176,8 +175,7 @@ Server.prototype.start = function ( backend ) {
         var out = [ ];
         for (var i = 0; i < files.length; i++) {
           var file = files[ i ];
-		  console.log(file);
-		  mode = file.extension == '+folder'? constants.S_IFDIR : constants.S_IFREG;
+          mode = file.extension == '+folder' ? constants.S_IFDIR : constants.S_IFREG;
           var o = {
             filename: file.name,
             longname: constructLongName( file ),
@@ -191,12 +189,12 @@ Server.prototype.start = function ( backend ) {
               mtime: file.modificationTime
             } )
           };
-		  
-		  sftp.cache[file.fullPath] = o.attrs;
+
+          //sftp.cache[file.fullPath] = o.attrs;
 
           out.push( o );
         }
-		console.log('cache size: ', Object.keys(sftp.cache).length);
+        //console.log('cache size: ', Object.keys(sftp.cache).length);
         return out;
       }
 
@@ -204,46 +202,93 @@ Server.prototype.start = function ( backend ) {
         console.log( "[SSH Server] : stat dir request", id, path );
 
         var constants = require( 'constants' );
-
-        var attrs_ = {
-          //mode: 0755 | constants.S_IFDIR,
+        var dirname = require( 'path' ).dirname( path );
+        var basename = require( 'path' ).basename( path );
+        /*
+		var attrs_ = {
+              //mode: 0755 | constants.S_IFDIR,
 		  mode: 0755 | constants.S_IFREG,
-          size: 1024,
-          uid: 9001,
-          gid: 9001,
-          atime: (Date.now() / 1000) | 0,
-          mtime: (Date.now() / 1000) | 0
-        };
-		
+              size: 1024,
+              uid: 9001,
+              gid: 9001,
+              atime: (Date.now() / 1000) | 0,
+              mtime: (Date.now() / 1000) | 0
+            };
+		*/
+        /*
 		if (sftp.cache[path]) {
 		  console.log('stats found in cache');
 		  attrs_ = sftp.cache[path];
 		}
 
-        sftp.attrs( id, new Stats(attrs_));
+            //sftp.attrs( id, new Stats(attrs_));
+		sftp.attrs( id, attrs_);
+		*/
+
+        var attrs_ = { };
+
+        if ( path == '/' ) {
+          // attrs_.mode = 0664 | constants.S_IFDIR;
+          sftp.attrs( id, attrs_ );
+          return;
+        }
+
+        backend.ls( dirname, function ( err, res ) {
+          //asSSHFile( res );
+
+          for (i = 0; i < res.length; ++i) {
+
+            var file = res[ i ];
+            if ( file.name == basename ) {
+
+              mode = file.extension == '+folder' ? constants.S_IFDIR : constants.S_IFREG;
+
+
+              attrs_ = new Stats( {
+                mode: 0644 | mode,
+                size: file.size,
+                uid: 9001,
+                gid: 8001,
+                atime: file.modificationTime,
+                mtime: file.modificationTime
+              } )
+
+              break;
+
+            }
+
+          }
+
+
+          sftp.attrs( id, attrs_ );
+
+        } );
+
 
 
       } );
 
-      sftp.once( 'LSTAT', function ( id, path ) {
+      sftp.on( 'LSTAT', function ( id, path ) {
         console.log( "[SSH Server] : lstate dir request", id, path );
-		
-		//get file attribute?
-		var attrs_ = new Stats({
-          mode: 0755 | constants.S_IFREG,
+
+        //get file attribute?
+        var attrs_ = new Stats( {
+          mode: 0644 | constants.S_IFREG,
           size: 1024,
           uid: 9001,
           gid: 9001,
           atime: (Date.now() / 1000) | 0,
           mtime: (Date.now() / 1000) | 0
-        });
-		
-		if (sftp.cache[path]) {
-		  console.log('stats found in cache');
-		  attrs_ = sftp.cache[path];
-		}
+        } );
 
-        sftp.attrs( id, new Stats(attrs_));
+        /*
+        if (sftp.cache[path]) {
+          console.log('stats found in cache');
+          attrs_ = sftp.cache[path];
+        }
+        */
+        //sftp.attrs( id, new Stats(attrs_));
+        sftp.attrs( id, attrs_ );
 
       } );
 
@@ -251,14 +296,10 @@ Server.prototype.start = function ( backend ) {
       sftp.on( 'OPENDIR', function ( id, path ) {
         console.log( "[SSH Server] : sftp on opendir request, id:" + id + ", path:" + path );
 
-
-
         // FIXME: Use counter.
         //var handle_ = new Buffer([ 1, 2, 3, Math.round(Math.random(4)) ]);
         var handle_ = new Buffer( randomValueHex() );
         //sftp.handles[ handle_ ] = path;
-
-
 
         sftp.handles[ handle_ ] = {
           path: path,
@@ -270,15 +311,11 @@ Server.prototype.start = function ( backend ) {
       } );
 
 
-
-
       sftp.on( 'READDIR', function ( id, handle ) {
         console.log( "[SSH Server] : readdir, id: ", id, handle );
 
 
         var path = sftp.handles[ handle ].path;
-
-
 
         //if (sftp.handles[handle]()) {
         if ( sftp.handles[ handle ].next_index > 0 ) {
@@ -286,9 +323,6 @@ Server.prototype.start = function ( backend ) {
           sftp.name( id, [ ] );
           return;
         }
-
-
-
         // NOTES here we call the folders module(function folders-local.ls) to
         // access local files.
 
@@ -329,15 +363,17 @@ Server.prototype.start = function ( backend ) {
 
             //var handle_ = new Buffer(/http_window.io_0:ssh/ + path);
             var handle_ = new Buffer( randomValueHex() ); //var handle_ = new Buffer(/http_window.io_0:ssh/ + path)
-            sftp.handles[ handle_ ] =  {
-			  stream: stream,
-			  transferred: 0,  //count how much bytes have been transferred
-			  //FIXME: move buff into here,
-			  hooked: false, //whether we already hook the events
-			  //readId: 0, //whether we have some FTP read command waiting for data
-			  queuedRead: [], //the read commands that are being queued, sometimes SFTP might issue multiple read concurrently and wait for the results to speed up through put
-			  readLength: 0, //what length is the waiting read command want to read.
-			};
+            sftp.handles[ handle_ ] = {
+              stream: stream,
+              transferred: 0, //count how much bytes have been transferred
+              //FIXME: move buff into here,
+              hooked: false, //whether we already hook the events
+              //readId: 0, //whether we have some FTP read command waiting for data
+              queuedRead: [], //the read commands that are being queued, sometimes SFTP might issue multiple read concurrently and wait for the results to speed up through put
+              readLength: 0, //what length is the waiting read command want to read.
+              isReadEnd: false,
+              buff: new Buffer( 0 )
+            };
             sftp.handle( id, handle_ );
 
 
@@ -370,8 +406,6 @@ Server.prototype.start = function ( backend ) {
               return;
             }
 
-
-
           } );
 
 
@@ -401,10 +435,10 @@ Server.prototype.start = function ( backend ) {
       } );
 
       // read file from ssh2
-      var isReadEnd = false;
+      //var isReadEnd = false;
 
       //var read = 0 ;
-      var buff = new Buffer(0);
+      //var buff = new Buffer(0);
 
 
       sftp.on( 'READ', function ( id, handle, offset, length ) {
@@ -423,125 +457,128 @@ Server.prototype.start = function ( backend ) {
         }
 
 
-		
-        if ( isReadEnd  ) { //we reach end-of-read, and transferred all the data!
-          console.log( "[SSH Server] : buffer end, id: " + id  + " transferred: " + sftp.handles[handle].transferred);
-		  
+
+        if ( sftp.handles[ handle ].isReadEnd ) { //we reach end-of-read, and transferred all the data!
+          console.log( "[SSH Server] : buffer end, id: " + id + " transferred: " + sftp.handles[ handle ].transferred );
+
           sftp.status( id, STATUS_CODE.EOF );
-          isReadEnd = false;
-          
-          buff = null;
+          sftp.handles[ handle ].isReadEnd = false;
+
+          sftp.handles[ handle ].buff = null;
           return;
         }
-		
-		
-		if ( !sftp.handles[handle].hooked  ) { //file has not been transferred => initial setup
-		  sftp.handles[handle].hooked = true;
-		  
+
+
+        if ( !sftp.handles[ handle ].hooked ) { //file has not been transferred => initial setup
+          sftp.handles[ handle ].hooked = true;
+
           // register only one 'end listner' during  
           // file transfer
           stream.once( 'end', function () {
             console.log( "[SSH Server] : read stream end," );
-            
-			//fulfill the last queued read with whatever I have:
-			if (sftp.handles[handle].queuedRead.length > 0) { //has an waiting read command
-			  //var length = sftp.handles[handle].readLength; //the read length from the request
-			  var cmd = sftp.handles[handle].queuedRead[0];
-			  //var length = cmd.length;
-			  var id = cmd.id;
-			  sftp.data( id, buff );
-			}
-			sftp.handles[handle].queuedRead.shift();
-			
-			if (sftp.handles[handle].queuedRead.length > 0) {
-			  //still got outstanding queued read, use this to deliver EOF
-			  var cmd = sftp.handles[handle].queuedRead[0];
-			  var id = cmd.id;
-			  sftp.status( id, STATUS_CODE.EOF );
-			}
-			
-			isReadEnd = true;
+
+            //fulfill the last queued read with whatever I have:
+            if ( sftp.handles[ handle ].queuedRead.length > 0 ) { //has an waiting read command
+              //var length = sftp.handles[handle].readLength; //the read length from the request
+              var cmd = sftp.handles[ handle ].queuedRead[ 0 ];
+              //var length = cmd.length;
+              var id = cmd.id;
+              sftp.data( id, sftp.handles[ handle ].buff );
+            }
+            sftp.handles[ handle ].queuedRead.shift();
+
+            if ( sftp.handles[ handle ].queuedRead.length > 0 ) {
+              //still got outstanding queued read, use this to deliver EOF
+              var cmd = sftp.handles[ handle ].queuedRead[ 0 ];
+              var id = cmd.id;
+              sftp.status( id, STATUS_CODE.EOF );
+            }
+
+            sftp.handles[ handle ].isReadEnd = true;
           // FIXME need a better way to specify the id,
           //sftp.status( id, STATUS_CODE.EOF );
           } );
-		  
-		  //set the 'data' and 'end' handler.
+
+          //set the 'data' and 'end' handler.
           stream.on( 'data', function ( chunk ) {
-			console.log('received data length: ', chunk.length);
+            console.log( 'received data length: ', chunk.length );
             // after recv a chunk data, we stop emitting data events
-			/*
-            stream.pause();
+            /*
+                    stream.pause();
 
-            var chunkLen = chunk.length;
-            console.log( "[SSH Server] : stream readable, id: " + id + ", length:"+ chunk.length );
+                    var chunkLen = chunk.length;
+                    console.log( "[SSH Server] : stream readable, id: " + id + ", length:"+ chunk.length );
 
-            if ( chunkLen > length ) {
-              // extract buffer of length 'length' from chunk
+                    if ( chunkLen > length ) {
+                      // extract buffer of length 'length' from chunk
 
-              var buf1 = chunk.slice( 0, length );
-              // store remaining chunk in buff
-              buff = chunk.slice( length );
+                      var buf1 = chunk.slice( 0, length );
+                      // store remaining chunk in buff
+                      buff = chunk.slice( length );
 
 			  sftp.handles[handle].transferred+=length;
-              // send buf1 of length to client
-              sftp.data( id, buf1 );
-            } else {
-              // chunk is smaller then requested length
-              // send it client as it is.
+                      // send buf1 of length to client
+                      sftp.data( id, buf1 );
+                    } else {
+                      // chunk is smaller then requested length
+                      // send it client as it is.
 			  console.log('sending chunk');
-              sftp.data( id, chunk );
+                      sftp.data( id, chunk );
 			  
 			  sftp.handles[handle].transferred+=chunkLen;
 			  
 			  //no more buffer => resume
 			  stream.resume();
-            }
-            */
-			buff = Buffer.concat([buff, chunk]);
-			console.log('buffer level: ', buff.length);
-			if (sftp.handles[handle].queuedRead.length > 0) { //has an waiting read command
-			  //var length = sftp.handles[handle].readLength; //the read length from the request
-			  var cmd = sftp.handles[handle].queuedRead[0];
-			  var length = cmd.length;
-			  var id = cmd.id;
-			  if ( buff.length >= length ) { //enough data to fulfill request
-				var buf1 = buff.slice( 0, length );
-				sftp.handles[handle].transferred += length;
-				sftp.data( id, buf1 );
-				buff = buff.slice( length );
-				console.log('fulfill waiting read: ' + id + " transferred: " + sftp.handles[handle].transferred + ' buffer level: ' + buff.length);
-				//sftp.handles[handle].readId  = 0;
-				//sftp.handles[handle].readLength  = 0;
-				//remove the request from queue
-				sftp.handles[handle].queuedRead.shift();
-			  }
-			  //don't send partial data!
-			  /*
+                    }
+                    */
+            sftp.handles[ handle ].buff = Buffer.concat( [
+              buff,
+              chunk
+            ] );
+            console.log( 'buffer level: ', sftp.handles[ handle ].buff.length );
+            if ( sftp.handles[ handle ].queuedRead.length > 0 ) { //has an waiting read command
+              //var length = sftp.handles[handle].readLength; //the read length from the request
+              var cmd = sftp.handles[ handle ].queuedRead[ 0 ];
+              var length = cmd.length;
+              var id = cmd.id;
+              if ( sftp.handles[ handle ].buff.length >= length ) { //enough data to fulfill request
+                var buf1 = sftp.handles[ handle ].buff.slice( 0, length );
+                sftp.handles[ handle ].transferred += length;
+                sftp.data( id, buf1 );
+                sftp.handles[ handle ].buff = sftp.handles[ handle ].buff.slice( length );
+                console.log( 'fulfill waiting read: ' + id + " transferred: " + sftp.handles[ handle ].transferred + ' buffer level: ' + buff.length );
+                //sftp.handles[handle].readId  = 0;
+                //sftp.handles[handle].readLength  = 0;
+                //remove the request from queue
+                sftp.handles[ handle ].queuedRead.shift();
+              }
+              //don't send partial data!
+              /*
 			  else {
 				//send all we have
 				sftp.handles[handle].transferred += buff.length;
 				sftp.data( sftp.handles[handle].readId, buff );
 				buff = new Buffer(0);
 			  }*/
-			  
-			  
-			}
-			
-			if (buff.length > 1E6) {
-			  stream.pause(); //buffer level too high, wait for downstream to consume first
-			}
+
+
+            }
+
+            if ( sftp.handles[ handle ].buff.length > 1E6 ) {
+              stream.pause(); //buffer level too high, wait for downstream to consume first
+            }
           } );
         }
-		
-		if ( buff.length >= length ) {
-		  var buf1 = buff.slice( 0, length );
-		  sftp.handles[handle].transferred += length;
-		  sftp.data( id, buf1 );
-		  buff = buff.slice( length );
-		  
-		  console.log('transferred: ' + sftp.handles[handle].transferred + ' buffer level: ' + buff.length);
-		} else {
-		  /*
+
+        if ( sftp.handles[ handle ].buff.length >= length ) {
+          var buf1 = sftp.handles[ handle ].buff.slice( 0, length );
+          sftp.handles[ handle ].transferred += length;
+          sftp.data( id, buf1 );
+          sftp.handles[ handle ].buff = sftp.handles[ handle ].buff.slice( length );
+
+          console.log( 'transferred: ' + sftp.handles[ handle ].transferred + ' buffer level: ' + sftp.handles[ handle ].buff.length );
+        } else {
+          /*
 		  //send all we have
 		  sftp.handles[handle].transferred += buff.length;
 		  if (buff.length > 0) { //only return if we have data!
@@ -550,50 +587,52 @@ Server.prototype.start = function ( backend ) {
 		  }
 		  else {
 		  */
-		  //not enough data, wait first!
-			console.log('queue read: ', id, length); //exhausted the buffer!
-			sftp.handles[handle].queuedRead.push({ id: id, length: length});
-			//sftp.handles[handle].readId = id;
-			//sftp.handles[handle].readLength = length;
-		  //}
-		}
-		
-		if (buff.length < 1E6 && !isReadEnd) {
-		  console.log('resume stream');
-		  stream.resume(); //downstream has consumed enough buffer => resume read!
-		}
-		
-
-		/*
-        if ( buff ) {
-          if ( buff.length > length ) {
-            var buf1 = buff.slice( 0, length );
-			sftp.handles[handle].transferred += length;
-            sftp.data( id, buf1 );
-            buff = buff.slice( length );
-
-          } else {
-			sftp.handles[handle].transferred += buff.length;
-            sftp.data( id, buff );
-            buff = null;
-            stream.resume();
-          }
-          //return ;
-
-        } else {
-          stream.resume();
-
+          //not enough data, wait first!
+          console.log( 'queue read: ', id, length ); //exhausted the buffer!
+          sftp.handles[ handle ].queuedRead.push( {
+            id: id,
+            length: length
+          } );
+        //sftp.handles[handle].readId = id;
+        //sftp.handles[handle].readLength = length;
+        //}
         }
-        */
+
+        if ( sftp.handles[ handle ].buff.length < 1E6 && !sftp.handles[ handle ].isReadEnd ) {
+          console.log( 'resume stream' );
+          stream.resume(); //downstream has consumed enough buffer => resume read!
+        }
 
 
-        
+        /*
+            if ( buff ) {
+              if ( buff.length > length ) {
+                var buf1 = buff.slice( 0, length );
+			sftp.handles[handle].transferred += length;
+                sftp.data( id, buf1 );
+                buff = buff.slice( length );
+
+              } else {
+			sftp.handles[handle].transferred += buff.length;
+                sftp.data( id, buff );
+                buff = null;
+                stream.resume();
+              }
+              //return ;
+
+            } else {
+              stream.resume();
+
+            }
+            */
+
+
 
 
       } );
 
       // FIXME need to add function which write data to certain offset
-      sftp.once( 'WRITE', function ( id, handle, offset, data ) {
+      sftp.on( 'WRITE', function ( id, handle, offset, data ) {
         console.log( "[SSH Server] : sftp write request, ", id, handle, offset,
           data );
 
@@ -610,50 +649,47 @@ Server.prototype.start = function ( backend ) {
         sftp.status( id, STATUS_CODE.OK );
 
       /*	
-        var path = sftp.handles[handle];
-        if (path == null || typeof (path) == 'undefined') {
-        	sftp.status(id, STATUS_CODE.FAILURE);
-        	return;
+          var path = sftp.handles[handle];
+          if (path == null || typeof (path) == 'undefined') {
+          	sftp.status(id, STATUS_CODE.FAILURE);
+          	return;
 
 			
 
-        }
-        
-        
+          }
+          
+
+          // generate the request message for folders module
+          var req = {
+          	uri : path,
+          	data : data,
+
+          	// FIXME need to add header,streamId,shareId
+          	streamId : "streamId",
+          	headers : {
+          		"X-File-Date" : "2013-09-07T21:40:55.000Z",
+          		"X-File-Name" : "stub-file.txt",
+          		"X-File-Size" : "960",
+          		"X-File-Type" : "text/plain"
+          	},
+          	shareId : "test-share-Id"
+          };
+          
+          // NOTES here we call the folders module(function folders-local.write)
+          // to access local files.
 
 
+          local.write(req, function(result, err) {
+          	if (err) {
+          		sftp.status(id, STATUS_CODE.FAILURE);
+          		return;
+          	}
+          	console.log(result);
 
-        // generate the request message for folders module
-        var req = {
-        	uri : path,
-        	data : data,
+          	sftp.status(id, STATUS_CODE.OK);
 
-        	// FIXME need to add header,streamId,shareId
-        	streamId : "streamId",
-        	headers : {
-        		"X-File-Date" : "2013-09-07T21:40:55.000Z",
-        		"X-File-Name" : "stub-file.txt",
-        		"X-File-Size" : "960",
-        		"X-File-Type" : "text/plain"
-        	},
-        	shareId : "test-share-Id"
-        };
-        
-        // NOTES here we call the folders module(function folders-local.write)
-        // to access local files.
-
-
-        local.write(req, function(result, err) {
-        	if (err) {
-        		sftp.status(id, STATUS_CODE.FAILURE);
-        		return;
-        	}
-        	console.log(result);
-
-        	sftp.status(id, STATUS_CODE.OK);
-
-        });
-        */
+          });
+          */
       } );
 
       sftp.on( 'REMOVE', function ( id, path ) {
@@ -672,38 +708,44 @@ Server.prototype.start = function ( backend ) {
         } );
 
       } );
-	  
-	  sftp.on('RMDIR',function(id,path){
-		console.log( "[SSH Server] : sftp rmdir request, ", id, path);
-		
-		backend.rmdir(path,function(err,res){
-		
-			if (err){
-			  		sftp.status(id, STATUS_CODE.FAILURE);
-			  }else{
-				  
-				  sftp.status(id, STATUS_CODE.OK);
-			  }
-			
-			
-		} );
-		
-		} );	
+
+      sftp.on( 'RMDIR', function ( id, path ) {
+        console.log( "[SSH Server] : sftp rmdir request, ", id, path );
+
+        backend.rmdir( path, function ( err, res ) {
+
+          if ( err ) {
+            sftp.status( id, STATUS_CODE.FAILURE );
+          } else {
+
+            sftp.status( id, STATUS_CODE.OK );
+          }
+
+
+        } );
+
+      } );
 
       sftp.on( 'REALPATH', function ( id, path ) {
         console.log( 'REALPATH', path );
 
+        path = require( 'path' ).normalize( path );
         var name = {
           filename: '/',
-          attrs: {
-            size: 0
-          }
+          attrs: new Stats( {
+            mode: 0644 | constants.S_IFDIR,
+            size: 4096,
+            uid: 9001,
+            gid: 8001,
+            atime: (Date.now() / 1000) | 0,
+            mtime: (Date.now() / 1000) | 0
+          } )
         };
 
-		
-		if (path !='.')
-		  name.filename = path;
-		
+
+        if ( path != '.' )
+          name.filename = path;
+
         sftp.name( id, name );
       } );
 
