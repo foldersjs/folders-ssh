@@ -89,3 +89,39 @@ ssh.write('/path1/path2/some_movie.mp4',data, function(err,result) {
         console.log("Write status ", result);
 });
 ```
+
+### unlink
+
+```js
+
+/**
+ * @param path, string, the path 
+ * @param cb, the callback function
+ * unlink(path,cb)
+ */
+
+ssh.unlink('/path1/path2/some_movie.mp4', function(err) {
+        
+		if (err){
+			console.log("Got error ",err);
+		}
+});
+```
+
+### rmdir
+
+```js
+
+/**
+ * @param path, string, the path 
+ * @param cb, the callback function
+ * rmdir(path,cb)
+ */
+
+ssh.rmdir('/path1/path2/', function(err) {
+        
+		if (err){
+			console.log("Got error ",err);
+		}
+});
+```
