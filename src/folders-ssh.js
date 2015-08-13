@@ -8,13 +8,14 @@ var ssh = require( 'ssh2' );
 var path = require( 'path' );
 var mime = require( 'mime' );
 
+var Config = require('../config');
 
 var FoldersSsh = function ( prefix, options ) {
-  this.prefix = prefix;
-  this.connectionString = options.connectionString;
+  this.prefix = prefix || Config.prefix;
+  this.connectionString = options.connectionString ;
 
   // this is a flag to start a embedded ssh(sftp) server, using for test/debug
-  var enableEmbeddedServer = options.enableEmbeddedServer || false;
+  var enableEmbeddedServer = options.enableEmbeddedServer ;
   if ( enableEmbeddedServer ) {
     var conn = parseConnString( this.connectionString );
     this.credentials = conn;
@@ -52,11 +53,28 @@ FoldersSsh.prototype.prepare = function () {
 };
 
 FoldersSsh.prototype.connect = function ( conn ) {
+  var privateKey ;
+  if (Config.client.privateKeyPath){
+  
+	  privateKey = require( 'fs' ).readFileSync( Config.client.privateKeyPath );
+	  
+  }
+  else if (Config.client.privateKey){
+	 
+	  privateKey = Config.client.privateKey ;
+  }
+  else{
+	  
+	  privateKey = require( 'fs' ).readFileSync( home() + '/.ssh/id_rsa' );
+  
+  }
+		
   conn.connect( {
     host: this.credentials.host,
     port: this.credentials.port,
     username: this.credentials.user,
-    privateKey: require( 'fs' ).readFileSync( home() + '/.ssh/id_rsa' )
+
+    privateKey: privateKey
   } );
 };
 
@@ -98,7 +116,7 @@ FoldersSsh.prototype.ls = function ( path, cb ) {
     conn.sftp( function ( err, sftp ) {
       if ( err ) {
         console.error( "[folders-ssh ls] error in sftp,", err );
-        cb( err );
+        return cb( err );
       }
 
       console.log( "[folders-ssh ls] begin to open dir" );
@@ -106,14 +124,14 @@ FoldersSsh.prototype.ls = function ( path, cb ) {
       sftp.opendir( path, function ( err, handle ) {
         if ( err ) {
           console.error( "[folders-ssh ls] error in opendir,", err )
-          cb( err );
+          return cb( err );
         }
 
         console.log( "[folders-ssh ls] begin conn ftp read dir,", handle );
         sftp.readdir( handle, { full: true }, function ( err, list ) {
           if ( err ) {
             console.error( "[folders-ssh ls] error in sftp,", err );
-            cb( err );
+            return cb( err );
           }
 
           console.log( "[folders-ssh ls] readdir result length," + list.length );
@@ -211,7 +229,7 @@ FoldersSsh.prototype.cat = function ( path, cb ) {
     conn.sftp( function ( err, sftp ) {
       if ( err ) {
         console.error( "[folders-ssh cat] error in sftp conn,", err );
-        cb( err );
+        return cb( err );
       }
 
       console.log( "[folders-ssh cat] begin conn sftp read file," );
@@ -392,7 +410,7 @@ FoldersSsh.prototype.unlink = function ( path, cb ) {
     conn.sftp( function ( err, sftp ) {
       if ( err ) {
         console.error( "[folders-ssh unlink] error in sftp conn,", err );
-        cb( err );
+        return cb( err );
       }
 
       console.log( "[folders-ssh unlink] begin conn sftp unlink file," );
@@ -402,7 +420,7 @@ FoldersSsh.prototype.unlink = function ( path, cb ) {
         if ( err ) {
 
           console.error( "[folders-ssh unlink] error in sftp unlink,", err );
-          cb( err );
+          return cb( err );
 
         }
         cb();
@@ -434,7 +452,7 @@ FoldersSsh.prototype.rmdir = function ( path, cb ) {
     conn.sftp( function ( err, sftp ) {
       if ( err ) {
         console.error( "[folders-ssh rmdir] error in sftp conn,", err );
-        cb( err );
+        return cb( err );
       }
 
       console.log( "[folders-ssh rmdir] begin conn sftp rmdir dir," );
@@ -444,7 +462,7 @@ FoldersSsh.prototype.rmdir = function ( path, cb ) {
         if ( err ) {
 
           console.error( "[folders-ssh rmdir] error in sftp rmdir,", err );
-          cb( err );
+          return cb( err );
 
         }
         cb();

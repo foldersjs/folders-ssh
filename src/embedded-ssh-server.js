@@ -8,6 +8,7 @@
 var ssh2 = require( 'ssh2' );
 var fs = require( 'fs' );
 var crypto = require( 'crypto' );
+var Config = require('../config');
 
 
 
@@ -21,9 +22,9 @@ var Fio = new require( "folders" );
  * debug function, example console.log('dEbug', a);
  * 
  */
-var Server = function ( credentials, debug ) {
+var Server = function ( credentials,debug) {
   this.SSHCredentials = credentials;
-  this.debug = debug;
+  this.debug = debug || Config.server.debug;
   this.sshServer = null;
   console.log( "[SSH Server] : inin the SSH Server,", this.SSHCredentials );
 };
@@ -53,13 +54,47 @@ Server.prototype.start = function ( backend ) {
   }
 
   // inin the pub key
-var pubKey = ssh2.utils.genPublicKey( ssh2.utils.parseKey( fs
+	
+  var pubKey ;		
+	
+  if (Config.client.publickKeyPath ){
+	  
+	  pubKey = ssh2.utils.genPublicKey( ssh2.utils.parseKey( fs
+    .readFileSync( Config.client.publickKeyPath ) ) );
+  }
+  else if (Config.client.publicKey ){
+	
+	   pubKey = ssh2.utils.genPublicKey( ssh2.utils.parseKey( Config.client.publicKey  ) );
+	  
+  }
+  else {
+  
+	  pubKey = ssh2.utils.genPublicKey( ssh2.utils.parseKey( fs
     .readFileSync( home() + '/.ssh/id_rsa.pub' ) ) );
+	  
+  }
+	
 
   console.log( "[SSH Server] : pubKey:", pubKey );
 
+  var privateKey ;
+	
+ if (Config.server.privateKeyPath){
+
+	 privateKey = fs.readFileSync( Config.server.privateKeyPath );
+ }
+ else if (Config.server.privateKey){
+ 
+	 privateKey = Config.server.privateKey
+	 
+ }else{
+ 
+	 privateKey = fs.readFileSync( home() + '/.ssh/id_rsa' )
+ };
+  	
   sshServer = new ssh2.Server( {
-    privateKey: fs.readFileSync( home() + '/.ssh/id_rsa' ),
+
+    privateKey: privateKey,
     debug: this.debug
   /* ,debug: function(a) { console.log('dEbug', a); } */
   }, function ( client ) {
@@ -67,8 +102,8 @@ var pubKey = ssh2.utils.genPublicKey( ssh2.utils.parseKey( fs
     console.log( "[SSH Server] : authentication client" );
     client.on( 'authentication', function ( ctx ) {
       console.log( ctx.method, ctx.username );
-      if ( ctx.method === 'publickey' ) {
-        if ( ctx.signature ) {
+      if ( ctx.method === 'publickey' && ctx.key.algo === pubKey.fulltype ) {
+		  if ( ctx.signature ) {
           var verifier = crypto.createVerify( ctx.sigAlgo );
           verifier.update( ctx.blob );
           if ( verifier.verify( pubKey.publicOrig, ctx.signature, 'binary' ) ) {
@@ -82,9 +117,26 @@ var pubKey = ssh2.utils.genPublicKey( ssh2.utils.parseKey( fs
           console.log( "[SSH Server] : authentication client accept" );
           ctx.accept();
         }
-      } else {
-        console.log( "[SSH Server] : authentication client accept" );
-        ctx.accept();
+		  
+      } else if (ctx.method === 'password'){
+		  
+		  var username = Config.client.username ;
+		  var password = Config.client.password ;
+		  if ( ctx.username === username && ctx.password === password){
+      		
+			  console.log( "[SSH Server] : authentication client accept" );
+              ctx.accept();
+		  }else{
+		  	
+			  console.log( "[SSH Server] : authentication client reject" );
+        	  ctx.reject();
+			  
+		  }
+		  
+	  }else {
+        console.log( "[SSH Server] : authentication client reject" );
+
+        ctx.reject();
       }
     } );
 
@@ -776,6 +828,7 @@ var pubKey = ssh2.utils.genPublicKey( ssh2.utils.parseKey( fs
         } );
       } );
     } );
+	  
 	client.on( 'end', function () {
 		
 		console.log( '[SSH Server] :  The client socket disconnected.' );
@@ -791,6 +844,7 @@ var pubKey = ssh2.utils.genPublicKey( ssh2.utils.parseKey( fs
 		console.log( '[SSH Server] :  The client socket was closed');
      
     } );  
+	 
 
   } );
 
