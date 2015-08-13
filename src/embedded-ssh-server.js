@@ -53,7 +53,7 @@ Server.prototype.start = function ( backend ) {
   }
 
   // inin the pub key
-  var pubKey = ssh2.utils.genPublicKey( ssh2.utils.parseKey( fs
+var pubKey = ssh2.utils.genPublicKey( ssh2.utils.parseKey( fs
     .readFileSync( home() + '/.ssh/id_rsa.pub' ) ) );
 
   console.log( "[SSH Server] : pubKey:", pubKey );
@@ -228,7 +228,7 @@ Server.prototype.start = function ( backend ) {
         var attrs_ = { };
 
         if ( path == '/' ) {
-          // attrs_.mode = 0664 | constants.S_IFDIR;
+          attrs_.mode = 0664 | constants.S_IFDIR;
           sftp.attrs( id, attrs_ );
           return;
         }
@@ -532,7 +532,7 @@ Server.prototype.start = function ( backend ) {
                     }
                     */
             sftp.handles[ handle ].buff = Buffer.concat( [
-              buff,
+              sftp.handles[ handle ].buff,
               chunk
             ] );
             console.log( 'buffer level: ', sftp.handles[ handle ].buff.length );
@@ -546,7 +546,7 @@ Server.prototype.start = function ( backend ) {
                 sftp.handles[ handle ].transferred += length;
                 sftp.data( id, buf1 );
                 sftp.handles[ handle ].buff = sftp.handles[ handle ].buff.slice( length );
-                console.log( 'fulfill waiting read: ' + id + " transferred: " + sftp.handles[ handle ].transferred + ' buffer level: ' + buff.length );
+                console.log( 'fulfill waiting read: ' + id + " transferred: " + sftp.handles[ handle ].transferred + ' buffer level: ' + sftp.handles[ handle ].buff.length );
                 //sftp.handles[handle].readId  = 0;
                 //sftp.handles[handle].readLength  = 0;
                 //remove the request from queue
@@ -776,6 +776,21 @@ Server.prototype.start = function ( backend ) {
         } );
       } );
     } );
+	client.on( 'end', function () {
+		
+		console.log( '[SSH Server] :  The client socket disconnected.' );
+     
+    } );
+	  
+	client.on( 'close', function (hadError) {
+		
+		if (hadError){
+			console.log( '[SSH Server] :  The client socket was closed due to error');
+		}
+		
+		console.log( '[SSH Server] :  The client socket was closed');
+     
+    } );  
 
   } );
 
