@@ -8,7 +8,8 @@
 var ssh2 = require( 'ssh2' );
 var fs = require( 'fs' );
 var crypto = require( 'crypto' );
-var Config = require('../config');
+var Config = require( '../config' );
+
 
 
 
@@ -22,7 +23,7 @@ var Fio = new require( "folders" );
  * debug function, example console.log('dEbug', a);
  * 
  */
-var Server = function ( credentials,debug) {
+var Server = function ( credentials, debug ) {
   this.SSHCredentials = credentials;
   this.debug = debug || Config.server.debug;
   this.sshServer = null;
@@ -54,46 +55,43 @@ Server.prototype.start = function ( backend ) {
   }
 
   // inin the pub key
-	
-  var pubKey ;		
-	
-  if (Config.client.publickKeyPath ){
-	  
-	  pubKey = ssh2.utils.genPublicKey( ssh2.utils.parseKey( fs
-    .readFileSync( Config.client.publickKeyPath ) ) );
+
+  var pubKey;
+
+  if ( Config.client.publickKeyPath ) {
+
+    pubKey = ssh2.utils.genPublicKey( ssh2.utils.parseKey( fs
+      .readFileSync( Config.client.publickKeyPath ) ) );
+  } else if ( Config.client.publicKey ) {
+
+    pubKey = ssh2.utils.genPublicKey( ssh2.utils.parseKey( Config.client.publicKey ) );
+
+  } else {
+
+    pubKey = ssh2.utils.genPublicKey( ssh2.utils.parseKey( fs
+      .readFileSync( home() + '/.ssh/id_rsa.pub' ) ) );
+
   }
-  else if (Config.client.publicKey ){
-	
-	   pubKey = ssh2.utils.genPublicKey( ssh2.utils.parseKey( Config.client.publicKey  ) );
-	  
-  }
-  else {
-  
-	  pubKey = ssh2.utils.genPublicKey( ssh2.utils.parseKey( fs
-    .readFileSync( home() + '/.ssh/id_rsa.pub' ) ) );
-	  
-  }
-	
+
 
   console.log( "[SSH Server] : pubKey:", pubKey );
 
-  var privateKey ;
-	
- if (Config.server.privateKeyPath){
+  var privateKey;
 
-	 privateKey = fs.readFileSync( Config.server.privateKeyPath );
- }
- else if (Config.server.privateKey){
- 
-	 privateKey = Config.server.privateKey
-	 
- }else{
- 
-	 privateKey = fs.readFileSync( home() + '/.ssh/id_rsa' )
- };
-  	
+  if ( Config.server.privateKeyPath ) {
+
+    privateKey = fs.readFileSync( Config.server.privateKeyPath );
+  } else if ( Config.server.privateKey ) {
+
+    privateKey = Config.server.privateKey
+
+  } else {
+
+    privateKey = fs.readFileSync( home() + '/.ssh/id_rsa' )
+  }
+  ;
+
   sshServer = new ssh2.Server( {
-
     privateKey: privateKey,
     debug: this.debug
   /* ,debug: function(a) { console.log('dEbug', a); } */
@@ -103,7 +101,7 @@ Server.prototype.start = function ( backend ) {
     client.on( 'authentication', function ( ctx ) {
       console.log( ctx.method, ctx.username );
       if ( ctx.method === 'publickey' && ctx.key.algo === pubKey.fulltype ) {
-		  if ( ctx.signature ) {
+        if ( ctx.signature ) {
           var verifier = crypto.createVerify( ctx.sigAlgo );
           verifier.update( ctx.blob );
           if ( verifier.verify( pubKey.publicOrig, ctx.signature, 'binary' ) ) {
@@ -117,23 +115,23 @@ Server.prototype.start = function ( backend ) {
           console.log( "[SSH Server] : authentication client accept" );
           ctx.accept();
         }
-		  
-      } else if (ctx.method === 'password'){
-		  
-		  var username = Config.client.username ;
-		  var password = Config.client.password ;
-		  if ( ctx.username === username && ctx.password === password){
-      		
-			  console.log( "[SSH Server] : authentication client accept" );
-              ctx.accept();
-		  }else{
-		  	
-			  console.log( "[SSH Server] : authentication client reject" );
-        	  ctx.reject();
-			  
-		  }
-		  
-	  }else {
+
+      } else if ( ctx.method === 'password' ) {
+
+        var username = Config.client.username;
+        var password = Config.client.password;
+        if ( ctx.username === username && ctx.password === password ) {
+
+          console.log( "[SSH Server] : authentication client accept" );
+          ctx.accept();
+        } else {
+
+          console.log( "[SSH Server] : authentication client reject" );
+          ctx.reject();
+
+        }
+
+      } else {
         console.log( "[SSH Server] : authentication client reject" );
 
         ctx.reject();
@@ -246,9 +244,65 @@ Server.prototype.start = function ( backend ) {
 
           out.push( o );
         }
+        out = addParCurDir( out );
         //console.log('cache size: ', Object.keys(sftp.cache).length);
         return out;
       }
+
+      function addParCurDir( out ) {
+
+        var isParDir = false;
+        var isCurDir = false;
+
+        for (var i = 0; i < out.length; ++i) {
+
+          if ( out[ i ].filename === '.' ) {
+            isCurDir = true;
+          }
+
+          if ( out[ i ].filename === '..' ) {
+            isParDir = true ;
+          }
+
+        }
+
+        if ( !isParDir ) {
+
+          out.push( {
+            filename: '.',
+            longname: 'drwxr-xr-x  56 ssh   ssh      4096 Nov 10 01:05 .',
+            attrs: new Stats( {
+              mode: 0755 | constants.S_IFDIR,
+              size: 4096,
+              uid: 9001,
+              gid: 8001,
+              atime: 1415599549,
+              mtime: 1415599590
+            } )
+          } );
+
+        }
+
+        if ( !isCurDir ) {
+
+          out.push( {
+            filename: '..',
+            longname: 'drwxr-xr-x   4 ssh   ssh      4096 May 16  2013 ..',
+            attrs: new Stats( {
+              mode: 0755 | constants.S_IFDIR,
+              size: 4096,
+              uid: 0,
+              gid: 0,
+              atime: 1368729954,
+              mtime: 1368729999
+            } )
+          } );
+
+        }
+
+        return out;
+      }
+
 
       sftp.on( 'STAT', function ( id, path ) {
         console.log( "[SSH Server] : stat dir request", id, path );
@@ -448,8 +502,7 @@ Server.prototype.start = function ( backend ) {
           // folders-local module when 'WRITE'
 
 
-          var pass = new require( 'stream' ).PassThrough()
-
+          var pass = new require( 'stream' ).PassThrough();
 
           backend.write( path, pass, function ( err, result ) {
 
@@ -463,6 +516,8 @@ Server.prototype.start = function ( backend ) {
 
           sftp.handles[ handle_ ] = { stream: pass, mode: 'w' };
           sftp.handle( id, handle_ );
+
+
           console.log( 'Opening file for write' );
 
         }
@@ -477,9 +532,11 @@ Server.prototype.start = function ( backend ) {
           sftp.handles[ handle ].stream.push( null );
         }
 
+
         if ( sftp.handles[ handle ] )
 
-          delete sftp.handles[ handle ];
+          delete sftp.handles[ handle ]
+          ;
 
         sftp.status( id, STATUS_CODE.OK );
 
@@ -683,6 +740,7 @@ Server.prototype.start = function ( backend ) {
 
       } );
 
+
       // FIXME need to add function which write data to certain offset
       sftp.on( 'WRITE', function ( id, handle, offset, data ) {
         console.log( "[SSH Server] : sftp write request, ", id, handle, offset,
@@ -699,6 +757,8 @@ Server.prototype.start = function ( backend ) {
 
         rs.push( data );
         sftp.status( id, STATUS_CODE.OK );
+
+
 
       /*	
           var path = sftp.handles[handle];
@@ -743,6 +803,8 @@ Server.prototype.start = function ( backend ) {
           });
           */
       } );
+
+
 
       sftp.on( 'REMOVE', function ( id, path ) {
         console.log( "[SSH Server] : sftp remove request, ", id, path );
@@ -801,7 +863,25 @@ Server.prototype.start = function ( backend ) {
         sftp.name( id, name );
       } );
 
+      sftp.on( 'MKDIR', function ( id, path, attrs ) {
 
+
+        console.log( "[SSH Server] : sftp mkdir request, ", id, path, attrs );
+
+        backend.mkdir( path, function ( err ) {
+
+          if ( err ) {
+            sftp.status( id, STATUS_CODE.FAILURE );
+          } else {
+
+            sftp.status( id, STATUS_CODE.OK );
+          }
+
+
+        } );
+
+
+      } );
 
     };
 
@@ -828,23 +908,23 @@ Server.prototype.start = function ( backend ) {
         } );
       } );
     } );
-	  
-	client.on( 'end', function () {
-		
-		console.log( '[SSH Server] :  The client socket disconnected.' );
-     
+
+    client.on( 'end', function () {
+
+      console.log( '[SSH Server] :  The client socket disconnected.' );
+
     } );
-	  
-	client.on( 'close', function (hadError) {
-		
-		if (hadError){
-			console.log( '[SSH Server] :  The client socket was closed due to error');
-		}
-		
-		console.log( '[SSH Server] :  The client socket was closed');
-     
-    } );  
-	 
+
+    client.on( 'close', function ( hadError ) {
+
+      if ( hadError ) {
+        console.log( '[SSH Server] :  The client socket was closed due to error' );
+      }
+
+      console.log( '[SSH Server] :  The client socket was closed' );
+
+    } );
+
 
   } );
 
