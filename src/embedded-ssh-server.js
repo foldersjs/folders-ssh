@@ -11,8 +11,6 @@ var crypto = require( 'crypto' );
 var Config = require( '../config' );
 
 
-
-
 // folders module for file system provider
 var Fio = new require( "folders" );
 
@@ -56,9 +54,12 @@ Server.prototype.start = function ( backend ) {
 
   // inin the pub key
 
+
   var pubKey;
 
+
   if ( Config.client.publickKeyPath ) {
+
 
     pubKey = ssh2.utils.genPublicKey( ssh2.utils.parseKey( fs
       .readFileSync( Config.client.publickKeyPath ) ) );
@@ -81,6 +82,7 @@ Server.prototype.start = function ( backend ) {
   if ( Config.server.privateKeyPath ) {
 
     privateKey = fs.readFileSync( Config.server.privateKeyPath );
+
   } else if ( Config.server.privateKey ) {
 
     privateKey = Config.server.privateKey
@@ -90,6 +92,7 @@ Server.prototype.start = function ( backend ) {
     privateKey = fs.readFileSync( home() + '/.ssh/id_rsa' )
   }
   ;
+
 
   sshServer = new ssh2.Server( {
     privateKey: privateKey,
@@ -131,7 +134,10 @@ Server.prototype.start = function ( backend ) {
 
         }
 
+
       } else {
+
+
         console.log( "[SSH Server] : authentication client reject" );
 
         ctx.reject();
@@ -249,16 +255,22 @@ Server.prototype.start = function ( backend ) {
         return out;
       }
 
+
       function addParCurDir( out ) {
+
 
         var isParDir = false;
         var isCurDir = false;
 
+
         for (var i = 0; i < out.length; ++i) {
+
 
           if ( out[ i ].filename === '.' ) {
             isCurDir = true;
           }
+
+
 
           if ( out[ i ].filename === '..' ) {
             isParDir = true ;
@@ -267,6 +279,7 @@ Server.prototype.start = function ( backend ) {
         }
 
         if ( !isParDir ) {
+
 
           out.push( {
             filename: '.',
@@ -283,7 +296,9 @@ Server.prototype.start = function ( backend ) {
 
         }
 
+
         if ( !isCurDir ) {
+
 
           out.push( {
             filename: '..',
@@ -302,6 +317,8 @@ Server.prototype.start = function ( backend ) {
 
         return out;
       }
+
+
 
 
       sftp.on( 'STAT', function ( id, path ) {
@@ -504,6 +521,15 @@ Server.prototype.start = function ( backend ) {
 
           var pass = new require( 'stream' ).PassThrough();
 
+          sftp.handles[ handle_ ] = {
+            stream: pass,
+            mode: 'w',
+            queuedWrite: [],
+            hooked: false
+          };
+
+          sftp.handle( id, handle_ );
+
           backend.write( path, pass, function ( err, result ) {
 
             if ( err ) {
@@ -512,11 +538,6 @@ Server.prototype.start = function ( backend ) {
             }
 
           } );
-
-
-          sftp.handles[ handle_ ] = { stream: pass, mode: 'w' };
-          sftp.handle( id, handle_ );
-
 
           console.log( 'Opening file for write' );
 
@@ -531,6 +552,7 @@ Server.prototype.start = function ( backend ) {
 
           sftp.handles[ handle ].stream.push( null );
         }
+
 
 
         if ( sftp.handles[ handle ] )
@@ -742,9 +764,16 @@ Server.prototype.start = function ( backend ) {
 
 
       // FIXME need to add function which write data to certain offset
+
+
       sftp.on( 'WRITE', function ( id, handle, offset, data ) {
+
         console.log( "[SSH Server] : sftp write request, ", id, handle, offset,
           data );
+
+        sftp.handles[ handle ].queuedWrite.push( id );
+
+
 
         var rs = sftp.handles[ handle ].stream;
 
@@ -755,53 +784,76 @@ Server.prototype.start = function ( backend ) {
         }
 
 
+        // hooking  events on first request  
+        if ( !sftp.handles[ handle ].hooked ) {
+          sftp.handles[ handle ].hooked = true ;
+
+          rs._read = function () {
+            var queueLength = sftp.handles[ handle ].queuedWrite.length;
+            for (var i = 0; i < queueLength; ++i) {
+              var id = sftp.handles[ handle ].queuedWrite[ i ];
+              console.log( "[SSH Server] : sftp sending response _read, ", id );
+              sftp.status( id, STATUS_CODE.OK );
+            }
+
+            for (var i = 0; i < queueLength; ++i) {
+
+              sftp.handles[ handle ].queuedWrite.shift();
+            }
+          }
+        }
+
         rs.push( data );
-        sftp.status( id, STATUS_CODE.OK );
+        //sftp.status( id, STATUS_CODE.OK );
 
 
 
-      /*	
-          var path = sftp.handles[handle];
-          if (path == null || typeof (path) == 'undefined') {
-          	sftp.status(id, STATUS_CODE.FAILURE);
-          	return;
+
+
+        /*	
+            var path = sftp.handles[handle];
+            if (path == null || typeof (path) == 'undefined') {
+            	sftp.status(id, STATUS_CODE.FAILURE);
+            	return;
 
 			
 
-          }
-          
+            }
+            
 
-          // generate the request message for folders module
-          var req = {
-          	uri : path,
-          	data : data,
+            // generate the request message for folders module
+            var req = {
+            	uri : path,
+            	data : data,
 
-          	// FIXME need to add header,streamId,shareId
-          	streamId : "streamId",
-          	headers : {
-          		"X-File-Date" : "2013-09-07T21:40:55.000Z",
-          		"X-File-Name" : "stub-file.txt",
-          		"X-File-Size" : "960",
-          		"X-File-Type" : "text/plain"
-          	},
-          	shareId : "test-share-Id"
-          };
-          
-          // NOTES here we call the folders module(function folders-local.write)
-          // to access local files.
+            	// FIXME need to add header,streamId,shareId
+            	streamId : "streamId",
+            	headers : {
+            		"X-File-Date" : "2013-09-07T21:40:55.000Z",
+            		"X-File-Name" : "stub-file.txt",
+            		"X-File-Size" : "960",
+            		"X-File-Type" : "text/plain"
+            	},
+            	shareId : "test-share-Id"
+            };
+            
+            // NOTES here we call the folders module(function folders-local.write)
+            // to access local files.
 
 
-          local.write(req, function(result, err) {
-          	if (err) {
-          		sftp.status(id, STATUS_CODE.FAILURE);
-          		return;
-          	}
-          	console.log(result);
+            local.write(req, function(result, err) {
+            	if (err) {
+            		sftp.status(id, STATUS_CODE.FAILURE);
+            		return;
+            	}
+            	console.log(result);
 
-          	sftp.status(id, STATUS_CODE.OK);
+            	sftp.status(id, STATUS_CODE.OK);
 
-          });
-          */
+            });
+            */
+
+
       } );
 
 
@@ -863,7 +915,10 @@ Server.prototype.start = function ( backend ) {
         sftp.name( id, name );
       } );
 
+
+
       sftp.on( 'MKDIR', function ( id, path, attrs ) {
+
 
 
         console.log( "[SSH Server] : sftp mkdir request, ", id, path, attrs );
@@ -909,7 +964,9 @@ Server.prototype.start = function ( backend ) {
       } );
     } );
 
+
     client.on( 'end', function () {
+
 
       console.log( '[SSH Server] :  The client socket disconnected.' );
 
@@ -923,8 +980,8 @@ Server.prototype.start = function ( backend ) {
 
       console.log( '[SSH Server] :  The client socket was closed' );
 
-    } );
 
+    } );
 
   } );
 
