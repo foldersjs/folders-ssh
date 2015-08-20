@@ -137,9 +137,7 @@ Server.prototype.start = function ( backend ) {
 
       } else {
 
-
         console.log( "[SSH Server] : authentication client reject" );
-
         ctx.reject();
       }
     } );
@@ -317,9 +315,6 @@ Server.prototype.start = function ( backend ) {
 
         return out;
       }
-
-
-
 
       sftp.on( 'STAT', function ( id, path ) {
         console.log( "[SSH Server] : stat dir request", id, path );
@@ -756,10 +751,6 @@ Server.prototype.start = function ( backend ) {
 
             }
             */
-
-
-
-
       } );
 
 
@@ -771,9 +762,7 @@ Server.prototype.start = function ( backend ) {
         console.log( "[SSH Server] : sftp write request, ", id, handle, offset,
           data );
 
-        sftp.handles[ handle ].queuedWrite.push( id );
-
-
+     
 
         var rs = sftp.handles[ handle ].stream;
 
@@ -803,7 +792,12 @@ Server.prototype.start = function ( backend ) {
           }
         }
 
-        rs.push( data );
+        if (rs.push( data )){
+			sftp.status( id, STATUS_CODE.OK );
+		
+		}else{
+			 sftp.handles[ handle ].queuedWrite.push( id );
+		}
         //sftp.status( id, STATUS_CODE.OK );
 
 
@@ -918,8 +912,6 @@ Server.prototype.start = function ( backend ) {
 
 
       sftp.on( 'MKDIR', function ( id, path, attrs ) {
-
-
 
         console.log( "[SSH Server] : sftp mkdir request, ", id, path, attrs );
 
