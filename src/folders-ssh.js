@@ -151,8 +151,6 @@ FoldersSsh.prototype.ls = function (path, cb) {
     this.connect(conn);
 };
 
-
-
 /*
  * This methods translates sftp records to folders.io compatible records.
  * 
@@ -225,21 +223,47 @@ FoldersSsh.prototype.cat = function (path, cb) {
             });
 
         // Via SFTP
-        console.log("[folders-ssh cat] begin to send cat request,");
+
+       
+		
+		
         conn.sftp(function (err, sftp) {
             if (err) {
                 console.error("[folders-ssh cat] error in sftp conn,", err);
                 return cb(err);
             }
 
-            console.log("[folders-ssh cat] begin conn sftp read file,");
+			
+			
+            
+			
+			sftp.stat(path,function(err,attrs){
+				
+				 if (err) {
+                	console.error("[folders-ssh cat] error in stat ,", err);
+                	return cb(err);
+           		 }
+				
+				console.log("[folders-ssh cat] got attrs for remote file ",attrs);
+				
+			 	console.log("[folders-ssh cat] begin to send cat request,");
+				
+				console.log("[folders-ssh cat] begin conn sftp read file,");
 
-            //var we simply return read stream rather than buffer
-            var stream = sftp.createReadStream(path);
+				
+				//var we simply return read stream rather than buffer
+	           var stream = sftp.createReadStream(path);
             //FIXME need to add size,name meta information here
-            cb(null, {
-                stream: stream
+  	          cb(null, {
+                stream: stream,
+				size:attrs.size,
+				name:require('path').basename(path)  
             });
+				
+			
+			});
+
+            
 
             //FIXME how to close the conn here??
 
@@ -507,6 +531,49 @@ FoldersSsh.prototype.mkdir = function (path, cb) {
                 if (err) {
 
                     console.error("[folders-ssh mkdir] error in sftp mkdir,", err);
+                    return cb(err);
+
+                }
+                return cb();
+
+            });
+
+
+        });
+
+    });
+
+    this.connect(conn);
+
+};
+
+
+FoldersSsh.prototype.stat = function (path, cb) {
+
+    var self = this;
+
+    console.log("[folders-ssh stat] folders-ssh, stat ", path);
+
+    // NOTES: Not using connection pooling nor re-using the connection.
+    var Client = require('ssh2').Client;
+    var conn = new Client();
+    conn.on('ready', function () {
+        console.log('[folders-ssh stat] Client :: ready');
+        // Via SFTP
+        console.log("[folders-ssh stat] begin to send stat request,");
+        conn.sftp(function (err, sftp) {
+            if (err) {
+                console.error("[folders-ssh stat] error in sftp conn,", err);
+                return cb(err);
+            }
+
+            console.log("[folders-ssh stat] begin conn sftp stat dir,");
+
+            sftp.stat(path, function (err,stats) {
+
+                if (err) {
+
+                    console.error("[folders-ssh stat] error in sftp stat,", err);
                     return cb(err);
 
                 }

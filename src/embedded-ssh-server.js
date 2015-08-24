@@ -97,7 +97,8 @@ Server.prototype.start = function ( backend ) {
   sshServer = new ssh2.Server( {
     privateKey: privateKey,
     debug: this.debug
-  /* ,debug: function(a) { console.log('dEbug', a); } */
+
+  
   }, function ( client ) {
 
     console.log( "[SSH Server] : authentication client" );
@@ -233,7 +234,7 @@ Server.prototype.start = function ( backend ) {
           var o = {
             filename: file.name,
             longname: constructLongName( file ),
-            //longname : file.uri,
+
             attrs: new Stats( {
               mode: 0644 | mode,
               size: file.size,
@@ -244,12 +245,13 @@ Server.prototype.start = function ( backend ) {
             } )
           };
 
-          //sftp.cache[file.fullPath] = o.attrs;
+
 
           out.push( o );
         }
         out = addParCurDir( out );
-        //console.log('cache size: ', Object.keys(sftp.cache).length);
+
+       
         return out;
       }
 
@@ -322,26 +324,6 @@ Server.prototype.start = function ( backend ) {
         var constants = require( 'constants' );
         var dirname = require( 'path' ).dirname( path );
         var basename = require( 'path' ).basename( path );
-        /*
-		var attrs_ = {
-              //mode: 0755 | constants.S_IFDIR,
-		  mode: 0755 | constants.S_IFREG,
-              size: 1024,
-              uid: 9001,
-              gid: 9001,
-              atime: (Date.now() / 1000) | 0,
-              mtime: (Date.now() / 1000) | 0
-            };
-		*/
-        /*
-		if (sftp.cache[path]) {
-		  console.log('stats found in cache');
-		  attrs_ = sftp.cache[path];
-		}
-
-            //sftp.attrs( id, new Stats(attrs_));
-		sftp.attrs( id, attrs_);
-		*/
 
         var attrs_ = { };
 
@@ -352,8 +334,9 @@ Server.prototype.start = function ( backend ) {
         }
 
         backend.ls( dirname, function ( err, res ) {
-          //asSSHFile( res );
 
+
+          
           for (i = 0; i < res.length; ++i) {
 
             var file = res[ i ];
@@ -398,14 +381,7 @@ Server.prototype.start = function ( backend ) {
           atime: (Date.now() / 1000) | 0,
           mtime: (Date.now() / 1000) | 0
         } );
-
-        /*
-        if (sftp.cache[path]) {
-          console.log('stats found in cache');
-          attrs_ = sftp.cache[path];
-        }
-        */
-        //sftp.attrs( id, new Stats(attrs_));
+       
         sftp.attrs( id, attrs_ );
 
       } );
@@ -435,14 +411,14 @@ Server.prototype.start = function ( backend ) {
 
         var path = sftp.handles[ handle ].path;
 
-        //if (sftp.handles[handle]()) {
+
         if ( sftp.handles[ handle ].next_index > 0 ) {
           console.log( 'return empty to indicate end of readdir' )
           sftp.name( id, [ ] );
           return;
         }
-        // NOTES here we call the folders module(function folders-local.ls) to
-        // access local files.
+        // NOTES here we call the folders module() to
+        // access synthetic file system  files.
 
 
         backend.ls( path, function ( err, res ) {
@@ -465,7 +441,7 @@ Server.prototype.start = function ( backend ) {
 
 
           // NOTES here we call the folders module(function folders-local.cat)
-          // to access backend files.
+          // to access synthetic file system backend files.
 
           backend.cat( path, function cb( err, results ) {
             if ( err ) {
@@ -673,19 +649,11 @@ Server.prototype.start = function ( backend ) {
                 sftp.data( id, buf1 );
                 sftp.handles[ handle ].buff = sftp.handles[ handle ].buff.slice( length );
                 console.log( 'fulfill waiting read: ' + id + " transferred: " + sftp.handles[ handle ].transferred + ' buffer level: ' + sftp.handles[ handle ].buff.length );
-                //sftp.handles[handle].readId  = 0;
-                //sftp.handles[handle].readLength  = 0;
-                //remove the request from queue
+
+
+
                 sftp.handles[ handle ].queuedRead.shift();
               }
-              //don't send partial data!
-              /*
-			  else {
-				//send all we have
-				sftp.handles[handle].transferred += buff.length;
-				sftp.data( sftp.handles[handle].readId, buff );
-				buff = new Buffer(0);
-			  }*/
 
 
             }
@@ -704,24 +672,17 @@ Server.prototype.start = function ( backend ) {
 
           console.log( 'transferred: ' + sftp.handles[ handle ].transferred + ' buffer level: ' + sftp.handles[ handle ].buff.length );
         } else {
-          /*
-		  //send all we have
-		  sftp.handles[handle].transferred += buff.length;
-		  if (buff.length > 0) { //only return if we have data!
-			sftp.data( id, buff );
-			buff = new Buffer(0);
-		  }
-		  else {
-		  */
-          //not enough data, wait first!
+
+
+
+          
           console.log( 'queue read: ', id, length ); //exhausted the buffer!
           sftp.handles[ handle ].queuedRead.push( {
             id: id,
             length: length
           } );
-        //sftp.handles[handle].readId = id;
-        //sftp.handles[handle].readLength = length;
-        //}
+
+        
         }
 
         if ( sftp.handles[ handle ].buff.length < 1E6 && !sftp.handles[ handle ].isReadEnd ) {
@@ -729,34 +690,14 @@ Server.prototype.start = function ( backend ) {
           stream.resume(); //downstream has consumed enough buffer => resume read!
         }
 
-
-        /*
-            if ( buff ) {
-              if ( buff.length > length ) {
-                var buf1 = buff.slice( 0, length );
-			sftp.handles[handle].transferred += length;
-                sftp.data( id, buf1 );
-                buff = buff.slice( length );
-
-              } else {
-			sftp.handles[handle].transferred += buff.length;
-                sftp.data( id, buff );
-                buff = null;
-                stream.resume();
-              }
-              //return ;
-
-            } else {
-              stream.resume();
-
-            }
-            */
+       
       } );
 
 
       // FIXME need to add function which write data to certain offset
 
 
+			//var queueLength = 0;
       sftp.on( 'WRITE', function ( id, handle, offset, data ) {
 
         console.log( "[SSH Server] : sftp write request, ", id, handle, offset,
@@ -779,13 +720,15 @@ Server.prototype.start = function ( backend ) {
 
           rs._read = function () {
             var queueLength = sftp.handles[ handle ].queuedWrite.length;
-            for (var i = 0; i < queueLength; ++i) {
+			var limit = queueLength < 5 ? queueLength : 5 ;
+			
+            for (var i = 0; i < limit; ++i) {
               var id = sftp.handles[ handle ].queuedWrite[ i ];
               console.log( "[SSH Server] : sftp sending response _read, ", id );
               sftp.status( id, STATUS_CODE.OK );
             }
 
-            for (var i = 0; i < queueLength; ++i) {
+            for (var i = 0; i < limit; ++i) {
 
               sftp.handles[ handle ].queuedWrite.shift();
             }
@@ -798,54 +741,7 @@ Server.prototype.start = function ( backend ) {
 		}else{
 			 sftp.handles[ handle ].queuedWrite.push( id );
 		}
-        //sftp.status( id, STATUS_CODE.OK );
 
-
-
-
-
-        /*	
-            var path = sftp.handles[handle];
-            if (path == null || typeof (path) == 'undefined') {
-            	sftp.status(id, STATUS_CODE.FAILURE);
-            	return;
-
-			
-
-            }
-            
-
-            // generate the request message for folders module
-            var req = {
-            	uri : path,
-            	data : data,
-
-            	// FIXME need to add header,streamId,shareId
-            	streamId : "streamId",
-            	headers : {
-            		"X-File-Date" : "2013-09-07T21:40:55.000Z",
-            		"X-File-Name" : "stub-file.txt",
-            		"X-File-Size" : "960",
-            		"X-File-Type" : "text/plain"
-            	},
-            	shareId : "test-share-Id"
-            };
-            
-            // NOTES here we call the folders module(function folders-local.write)
-            // to access local files.
-
-
-            local.write(req, function(result, err) {
-            	if (err) {
-            		sftp.status(id, STATUS_CODE.FAILURE);
-            		return;
-            	}
-            	console.log(result);
-
-            	sftp.status(id, STATUS_CODE.OK);
-
-            });
-            */
 
 
       } );
