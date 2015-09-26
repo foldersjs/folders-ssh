@@ -11,6 +11,7 @@ var mime = require('mime');
 var Config = require('../config');
 
 var FoldersSsh = function (prefix, options) {
+	this.options = options || {};
     this.prefix = prefix || Config.prefix;
     this.connectionString = options.connectionString;
 
@@ -26,6 +27,13 @@ var FoldersSsh = function (prefix, options) {
     }
 };
 
+FoldersSsh.dataVolume = function(){
+
+	return {RXOK:FoldersSsh.RXOK,TXOK:FoldersSsh.TXOK};
+};
+
+FoldersSsh.TXOK= 0 ;
+FoldersSsh.RXOK = 0;
 module.exports = FoldersSsh;
 
 FoldersSsh.prototype.features = FoldersSsh.features = {
@@ -359,6 +367,7 @@ FoldersSsh.prototype.write = function (path, data, cb) {
 
                         data.on('data', function (buf) {
 
+							FoldersSsh.RXOK +=buf.length;
 
                             sftp.write(handle, buf, 0, buf.length, 5, function (err) {
 
@@ -587,7 +596,11 @@ FoldersSsh.prototype.stat = function (path, cb) {
     });
 
     this.connect(conn);
+};
 
+FoldersSsh.prototype.dump = function(){
+	
+	return this.options;
 };
 
 var home = function () {
